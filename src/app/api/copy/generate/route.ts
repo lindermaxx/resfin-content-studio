@@ -110,7 +110,7 @@ function buildUserPrompt(req: GenerateCopyRequest): string {
 ${req.contextoViral}
 """
 ${req.metricas?.length ? `Métricas de viralização: ${req.metricas.join(" | ")}` : ""}
-ESTRATÉGIA: Entre na trend. Use a mesma estrutura, o mesmo tipo de hook e o mesmo mecanismo que fez este conteúdo viralizar — mas conte para médicos brasileiros no contexto de finanças pessoais. Mesmo formato, mesmo ritmo, realidade diferente.
+ESTRATÉGIA DE TREND HIJACKING: Entre na trend com adaptação cirúrgica. Mantenha o hook original quase intacto — troque apenas o protagonista e o contexto para o universo do médico. Quanto mais próximo do original, mais carona na trend. Exemplo: "5 coisas que pessoas ricas fazem" → "5 coisas que médicos ricos fazem e que você não faz". Mesmo ritmo, mesma estrutura, mesmo mecanismo de viralização — só o espelho muda para o médico se reconhecer.
 `
     : "";
 
