@@ -41,21 +41,38 @@ export async function POST() {
     }
 
     const model = process.env.GOOGLE_TEXT_MODEL || "gemini-3-pro-preview";
-
     const genAI = new GoogleGenerativeAI(apiKey);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const gemini = genAI.getGenerativeModel({
-      model,
-      tools: [{ googleSearch: {} } as any],
-    });
 
-    const result = await gemini.generateContent(PROMPT);
-    const text = result.response.text().trim();
+    // Tenta com Google Search grounding; se o modelo não suportar, roda sem o tool
+    let rawText: string;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const geminiWithSearch = genAI.getGenerativeModel({
+        model,
+        tools: [{ googleSearch: {} } as any],
+      });
+      const result = await geminiWithSearch.generateContent(PROMPT);
+      rawText = result.response.text().trim();
+    } catch {
+      // Fallback sem grounding
+      const geminiPlain = genAI.getGenerativeModel({ model });
+      const result = await geminiPlain.generateContent(PROMPT);
+      rawText = result.response.text().trim();
+    }
 
-    const clean = text
+    const clean = rawText
       .replace(/^```json\n?/, "")
       .replace(/\n?```$/, "")
       .trim();
+
+    // Se o modelo retornou texto de erro em vez de JSON, expõe a mensagem real
+    if (!clean.startsWith("[") && !clean.startsWith("{")) {
+      console.error("[/api/research/trends] Resposta não-JSON:", clean.slice(0, 300));
+      return NextResponse.json(
+        { error: `Modelo retornou resposta inesperada: ${clean.slice(0, 200)}` },
+        { status: 500 }
+      );
+    }
 
     let trends: Trend[];
     try {
