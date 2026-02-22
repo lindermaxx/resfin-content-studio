@@ -4,36 +4,30 @@ import { NextResponse } from "next/server";
 export const maxDuration = 60;
 
 export interface Trend {
-  titulo: string;
-  plataforma: "Instagram" | "YouTube" | "TikTok" | "LinkedIn" | "Twitter";
-  pilar:
-    | "educacao_financeira"
-    | "investimentos_carteira"
-    | "organizacao_orcamento"
-    | "mentalidade_comportamento"
-    | "noticias_comentadas"
-    | "solucoes_patrimoniais"
-    | "bastidores";
-  hook: string;
-  justificativa: string; // por que esse tema está em alta — baseado em dados reais
-  dados: string[];       // métricas e evidências encontradas (buscas, notícias, cobertura)
+  titulo: string;       // manchete/tema exatamente como está em alta
+  plataforma: string;   // onde está em alta: Instagram, YouTube, TikTok, LinkedIn, Twitter, Google, Portais
+  metricas: string[];   // evidências de viralização: views, buscas, compartilhamentos, engajamento
+  fonte: string;        // nome do veículo/plataforma de origem
+  url: string;          // link para a fonte original (quando disponível)
 }
 
-const PROMPT = `Você é um especialista em estratégia de conteúdo para redes sociais, focado em finanças pessoais e planejamento financeiro para médicos brasileiros.
+const PROMPT = `Pesquise o que está em alta no Brasil AGORA. Use sua capacidade de busca para encontrar os trending topics reais desta semana.
 
-Use sua capacidade de busca para pesquisar o que está em alta AGORA no Brasil relacionado a: finanças pessoais, investimentos, economia, planejamento financeiro, mercado imobiliário, imposto de renda, previdência, e temas relevantes para médicos de alta renda.
+Retorne SOMENTE um array JSON válido (sem markdown, sem texto adicional) com exatamente 10 trending topics brasileiros.
 
-Retorne SOMENTE um array JSON válido (sem markdown, sem texto adicional) com exatamente 10 trending topics relevantes para o perfil @residenciaemfinancas.
+IMPORTANTE:
+- Não filtre por tema — busque o que está realmente viral no Brasil agora (economia, política, saúde, tecnologia, comportamento, qualquer tema)
+- Não adapte para médicos ou finanças — traga a manchete/tema exatamente como está circulando
+- Foque em evidências de viralização: quantos views, quantas buscas, qual o engajamento real
 
 Cada item deve ter exatamente estes campos:
-- "titulo": string — tema específico e atual do post
-- "plataforma": string — onde o tema está mais em alta: "Instagram", "YouTube", "TikTok", "LinkedIn" ou "Twitter"
-- "pilar": string — um dos valores exatos: "educacao_financeira", "investimentos_carteira", "organizacao_orcamento", "mentalidade_comportamento", "noticias_comentadas", "solucoes_patrimoniais", "bastidores"
-- "hook": string — frase de abertura impactante para o post (máximo 15 palavras, sem imperativo)
-- "justificativa": string — 1-2 frases explicando POR QUE esse tema está em alta agora, com dados reais que você encontrou (notícias recentes, tendências de busca, cobertura de mídia, contexto econômico atual)
-- "dados": array de strings — liste 2-4 evidências concretas encontradas, como: termos em alta no Google, notícias recentes com data, dados do Banco Central, números de engajamento que encontrou, cobertura em veículos financeiros (ex: "Selic em 13,75% — pauta dominante no InfoMoney esta semana", "Busca por 'PGBL médico' cresceu em jan/2026 segundo Google Trends")
+- "titulo": string — o tema/manchete exatamente como está em alta (não adapte)
+- "plataforma": string — onde está mais em alta ("Instagram", "YouTube", "TikTok", "LinkedIn", "Twitter", "Google Trends", "Portais de Notícia")
+- "metricas": array de strings — evidências concretas de viralização que você encontrou, como: número de views, quantidade de buscas, posição no Google Trends, número de publicações, engajamento em posts (ex: "3,2M views no TikTok em 48h", "Top 5 Google Trends BR nesta semana", "12.000 posts no Instagram com a hashtag", "450k compartilhamentos no WhatsApp segundo dados do Twitter")
+- "fonte": string — nome do veículo ou plataforma onde você encontrou os dados (ex: "Google Trends", "InfoMoney", "Folha de S.Paulo", "TikTok", "G1")
+- "url": string — link direto para a fonte onde os dados podem ser verificados (se não encontrar URL específica, use a URL principal do veículo)
 
-Priorize temas com evidências reais encontradas nas suas buscas. Retorne apenas o JSON.`;
+Retorne apenas o array JSON.`;
 
 export async function POST() {
   try {
@@ -46,10 +40,9 @@ export async function POST() {
       );
     }
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-
     const model = process.env.GOOGLE_TEXT_MODEL || "gemini-3-pro-preview";
 
+    const genAI = new GoogleGenerativeAI(apiKey);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const gemini = genAI.getGenerativeModel({
       model,
@@ -59,7 +52,6 @@ export async function POST() {
     const result = await gemini.generateContent(PROMPT);
     const text = result.response.text().trim();
 
-    // Remove markdown code blocks se presentes
     const clean = text
       .replace(/^```json\n?/, "")
       .replace(/\n?```$/, "")

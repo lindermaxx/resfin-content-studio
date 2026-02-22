@@ -50,8 +50,8 @@ export default function ResearchPage() {
     const context = selectedTrend
       ? {
           tema: selectedTrend.titulo,
-          pilar: selectedTrend.pilar,
-          hook: selectedTrend.hook,
+          pilar: null,
+          hook: null,
           rascunho: rascunho.trim(),
           source: "trend" as const,
         }
