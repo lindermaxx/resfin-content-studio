@@ -1,16 +1,10 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
+import type { Trend } from "@/lib/research-types";
 
 export const maxDuration = 60;
 
-export interface Trend {
-  titulo: string;
-  plataforma: string;
-  metricas: string[];
-  fonte: string;
-  url: string;
-  contexto: string;
-}
+export type { Trend };
 
 // ── Google Trends RSS (Brasil) — instant, no Apify ─────────────────────────
 interface GoogleTrendItem {

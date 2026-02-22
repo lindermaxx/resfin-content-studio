@@ -3,7 +3,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
-import type { Trend } from "@/app/api/research/trends/route";
+import type { Trend } from "@/lib/research-types";
 
 interface TrendCardProps {
   trend: Trend;

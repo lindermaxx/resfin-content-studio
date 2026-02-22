@@ -1,28 +1,10 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
+import type { CopyIdea, GenerateCopyRequest } from "@/lib/copy-types";
 
-export const maxDuration = 60; // segundos — necessário para geração com Claude
+export const maxDuration = 60;
 
-export interface CopyIdea {
-  angulo: "educativo" | "provocativo" | "storytelling";
-  hook: string;
-  copy: string;
-  visual: string;
-  cta: string;
-}
-
-export interface GenerateCopyRequest {
-  tema: string;
-  pilar: string | null;
-  hook: string | null;
-  rascunho: string;
-  source: "trend" | "manual";
-  formato: "carrossel" | "post_estatico" | "reels" | "stories";
-  voz: "max_linder" | "rian_tavares" | "marca_institucional";
-  contextoViral: string | null; // roteiro/caption/descrição do conteúdo que viralizou
-  plataforma: string | null;
-  metricas: string[];
-}
+export type { CopyIdea, GenerateCopyRequest };
 
 const SYSTEM_PROMPT = `Você é Leandro Ladeira (Ladeirinha) — copywriter e estrategista digital.
 Criador do Light Copy: método que vende sem parecer que está vendendo.

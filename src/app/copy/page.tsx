@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
-import type { CopyIdea, GenerateCopyRequest } from "@/app/api/copy/generate/route";
+import type { CopyIdea, GenerateCopyRequest } from "@/lib/copy-types";
 
 type Formato = GenerateCopyRequest["formato"];
 type Voz = GenerateCopyRequest["voz"];

@@ -13,9 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import type { Trend } from "@/app/api/research/trends/route";
-import type { ExtractedContent } from "@/app/api/research/extract-url/route";
-import type { CompetitorPost } from "@/app/api/research/competitor-posts/route";
+import type { Trend, ExtractedContent, CompetitorPost } from "@/lib/research-types";
 
 const TRENDS_CACHE_KEY = "resfin_trends_v2";
 const PROFILES_KEY = "resfin_profiles_v1";

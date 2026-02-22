@@ -4,15 +4,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { writeFileSync, unlinkSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
+import type { ExtractedContent } from "@/lib/research-types";
 
 export const maxDuration = 60;
 
-export interface ExtractedContent {
-  titulo: string;
-  plataforma: string;
-  tipo: "reels" | "carrossel" | "video" | "artigo" | "post";
-  transcricao: string;
-}
+export type { ExtractedContent };
 
 const MAX_VIDEO_BYTES = 40 * 1024 * 1024; // 40 MB
 

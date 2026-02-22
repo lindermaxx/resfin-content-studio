@@ -1,19 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { CompetitorPost } from "@/lib/research-types";
 
 export const maxDuration = 60;
 
-export interface CompetitorPost {
-  url: string;
-  username: string;
-  caption: string;
-  tipo: "reels" | "carrossel" | "post";
-  likesCount: number;
-  commentsCount: number;
-  videoViewCount: number;
-  timestamp: string; // ISO string
-  thumbnailUrl: string;
-  engagementScore: number;
-}
+export type { CompetitorPost };
 
 async function runActor(
   actorId: string,
