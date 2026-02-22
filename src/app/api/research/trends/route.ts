@@ -4,76 +4,164 @@ import { NextResponse } from "next/server";
 export const maxDuration = 60;
 
 export interface Trend {
-  titulo: string;       // manchete/tema exatamente como está em alta
-  plataforma: string;   // onde está em alta: Instagram, YouTube, TikTok, LinkedIn, Twitter, Google, Portais
-  metricas: string[];   // evidências de viralização: views, buscas, compartilhamentos, engajamento
-  fonte: string;        // nome do veículo/plataforma de origem
-  url: string;          // link para a fonte original (quando disponível)
+  titulo: string;
+  plataforma: string;
+  metricas: string[];
+  fonte: string;
+  url: string;
 }
 
-const PROMPT = `Você é um analista de tendências digitais do Brasil. Use sua capacidade de busca para identificar o que está viral no Brasil nesta semana.
+// Chama um actor Apify via REST API síncrona e retorna os itens do dataset
+async function runActor(
+  actorId: string,
+  input: Record<string, unknown>,
+  token: string,
+  timeoutSecs = 40
+): Promise<unknown[]> {
+  const params = new URLSearchParams({
+    token,
+    timeout: String(timeoutSecs),
+    memory: "256",
+  });
 
-Retorne SOMENTE um array JSON válido com exatamente 10 objetos. Sem markdown, sem texto antes ou depois do array.
+  const res = await fetch(
+    `https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items?${params}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+      signal: AbortSignal.timeout((timeoutSecs + 5) * 1000),
+    }
+  );
 
-REGRAS OBRIGATÓRIAS:
-- Traga temas de qualquer categoria que estejam virais agora (economia, política, saúde, tecnologia, entretenimento, comportamento)
-- NÃO filtre para médicos ou finanças — manchete exata como está circulando
-- Todos os 4 campos são OBRIGATÓRIOS em todos os 10 itens — nunca deixe vazio ou null
-- Para "metricas": se não tiver número exato, estime com base no que sabe ("estimado X milhões de views", "tendência crescente no Google Trends BR") — mas SEMPRE preencha com pelo menos 2 itens
-- Para "url": use a URL do veículo principal onde o tema está em alta (ex: "https://g1.globo.com", "https://www.tiktok.com/trending", "https://trends.google.com/trends/?geo=BR")
+  if (!res.ok) {
+    throw new Error(`Actor ${actorId} retornou ${res.status}: ${await res.text()}`);
+  }
 
-Estrutura obrigatória de cada item:
-{
-  "titulo": "manchete ou tema exatamente como está em alta no Brasil",
-  "plataforma": "Instagram" | "YouTube" | "TikTok" | "LinkedIn" | "Twitter" | "Google Trends" | "Portais de Notícia",
-  "metricas": ["métrica 1 de viralização com número ou estimativa", "métrica 2", "métrica 3"],
-  "fonte": "nome do veículo ou plataforma (ex: G1, InfoMoney, TikTok, Google Trends)",
-  "url": "https://url-da-fonte.com"
+  return res.json();
 }
 
-Retorne apenas o array JSON com 10 itens.`;
+// Trunca array para não estourar tokens do Gemini
+function truncate<T>(arr: T[], max: number): T[] {
+  return arr.slice(0, max);
+}
 
 export async function POST() {
   try {
-    const apiKey = process.env.GOOGLE_AI_API_KEY;
+    const apifyToken = process.env.APIFY_API_TOKEN;
+    const googleKey = process.env.GOOGLE_AI_API_KEY;
+    const googleModel = process.env.GOOGLE_TEXT_MODEL || "gemini-3-pro-preview";
 
-    if (!apiKey) {
+    if (!apifyToken) {
       return NextResponse.json(
-        { error: "Chave da API Google não configurada. Verifique as variáveis de ambiente." },
+        { error: "APIFY_API_TOKEN não configurado nas variáveis de ambiente." },
+        { status: 500 }
+      );
+    }
+    if (!googleKey) {
+      return NextResponse.json(
+        { error: "GOOGLE_AI_API_KEY não configurado." },
         { status: 500 }
       );
     }
 
-    const model = process.env.GOOGLE_TEXT_MODEL || "gemini-3-pro-preview";
-    const genAI = new GoogleGenerativeAI(apiKey);
+    // Roda todos os scrapers em paralelo — usa o que completar dentro do timeout
+    const [googleTrendsResult, youtubeResult, tiktokResult, instagramResult] =
+      await Promise.allSettled([
+        // Google Trends Brasil
+        runActor(
+          "petr.cermak~google-trends-scraper",
+          { geo: "BR", type: "daily", limit: 20 },
+          apifyToken
+        ),
+        // YouTube trending Brasil
+        runActor(
+          "apify~youtube-scraper",
+          {
+            searchQueries: ["trending brasil hoje", "viral brasil semana"],
+            maxResults: 15,
+            proxyConfiguration: { useApifyProxy: true },
+          },
+          apifyToken
+        ),
+        // TikTok trending
+        runActor(
+          "clockworks~free-tiktok-scraper",
+          { type: "trending", limit: 20 },
+          apifyToken
+        ),
+        // Instagram hashtags em alta no Brasil
+        runActor(
+          "apify~instagram-hashtag-scraper",
+          {
+            hashtags: ["brasil", "viral", "noticias"],
+            resultsPerPage: 15,
+          },
+          apifyToken
+        ),
+      ]);
 
-    // Tenta com Google Search grounding; se o modelo não suportar, roda sem o tool
-    let rawText: string;
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const geminiWithSearch = genAI.getGenerativeModel({
-        model,
-        tools: [{ googleSearch: {} } as any],
-      });
-      const result = await geminiWithSearch.generateContent(PROMPT);
-      rawText = result.response.text().trim();
-    } catch {
-      // Fallback sem grounding
-      const geminiPlain = genAI.getGenerativeModel({ model });
-      const result = await geminiPlain.generateContent(PROMPT);
-      rawText = result.response.text().trim();
+    // Extrai resultados dos que tiveram sucesso
+    const rawData = {
+      googleTrends:
+        googleTrendsResult.status === "fulfilled"
+          ? truncate(googleTrendsResult.value, 20)
+          : null,
+      youtube:
+        youtubeResult.status === "fulfilled"
+          ? truncate(youtubeResult.value, 10)
+          : null,
+      tiktok:
+        tiktokResult.status === "fulfilled"
+          ? truncate(tiktokResult.value, 10)
+          : null,
+      instagram:
+        instagramResult.status === "fulfilled"
+          ? truncate(instagramResult.value, 10)
+          : null,
+    };
+
+    // Log quais fontes responderam
+    const fontesSucesso = Object.entries(rawData)
+      .filter(([, v]) => v !== null)
+      .map(([k]) => k);
+    console.log("[/api/research/trends] Fontes com dados:", fontesSucesso);
+
+    if (fontesSucesso.length === 0) {
+      return NextResponse.json(
+        { error: "Nenhuma fonte de dados respondeu dentro do tempo limite. Tente novamente." },
+        { status: 500 }
+      );
     }
 
-    const clean = rawText
-      .replace(/^```json\n?/, "")
-      .replace(/\n?```$/, "")
-      .trim();
+    // Usa Gemini para formatar os dados brutos em Trend[]
+    const genAI = new GoogleGenerativeAI(googleKey);
+    const gemini = genAI.getGenerativeModel({ model: googleModel });
 
-    // Se o modelo retornou texto de erro em vez de JSON, expõe a mensagem real
-    if (!clean.startsWith("[") && !clean.startsWith("{")) {
-      console.error("[/api/research/trends] Resposta não-JSON:", clean.slice(0, 300));
+    const prompt = `Você recebeu dados reais de múltiplas fontes sobre o que está em alta no Brasil agora.
+Analise os dados e retorne SOMENTE um array JSON com exatamente 10 trending topics.
+
+DADOS BRUTOS:
+${JSON.stringify(rawData, null, 2).slice(0, 12000)}
+
+REGRAS:
+- Use APENAS dados presentes nos resultados acima — não invente
+- Extraia métricas reais dos dados (views, likes, buscas, posição no ranking)
+- titulo: manchete/tema exatamente como está no dado bruto
+- plataforma: qual plataforma forneceu o dado ("Google Trends", "YouTube", "TikTok", "Instagram")
+- metricas: array com 2-4 strings de métricas REAIS extraídas dos dados (views, likes, buscas, posição)
+- fonte: nome do veículo/plataforma
+- url: URL real do item (use a URL do vídeo, post ou busca se disponível nos dados)
+
+Retorne apenas o array JSON com 10 objetos. Sem markdown.`;
+
+    const result = await gemini.generateContent(prompt);
+    const text = result.response.text().trim();
+    const clean = text.replace(/^```json\n?/, "").replace(/\n?```$/, "").trim();
+
+    if (!clean.startsWith("[")) {
       return NextResponse.json(
-        { error: `Modelo retornou resposta inesperada: ${clean.slice(0, 200)}` },
+        { error: `Gemini retornou resposta inesperada: ${clean.slice(0, 200)}` },
         { status: 500 }
       );
     }
@@ -83,14 +171,7 @@ export async function POST() {
       trends = JSON.parse(clean);
     } catch {
       return NextResponse.json(
-        { error: "A API retornou um formato inesperado. Tente novamente." },
-        { status: 500 }
-      );
-    }
-
-    if (!Array.isArray(trends) || trends.length === 0) {
-      return NextResponse.json(
-        { error: "Nenhum trend retornado. Tente novamente." },
+        { error: "Erro ao processar os dados. Tente novamente." },
         { status: 500 }
       );
     }
@@ -100,7 +181,7 @@ export async function POST() {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[/api/research/trends]", message);
     return NextResponse.json(
-      { error: `Erro ao buscar trending topics: ${message}` },
+      { error: `Erro ao buscar trends: ${message}` },
       { status: 500 }
     );
   }
