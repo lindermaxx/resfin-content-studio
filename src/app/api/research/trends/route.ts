@@ -48,10 +48,11 @@ export async function POST() {
 
     const genAI = new GoogleGenerativeAI(apiKey);
 
-    // Usa gemini-2.0-flash para grounding — suporte nativo ao Google Search
+    const model = process.env.GOOGLE_TEXT_MODEL || "gemini-3-pro-preview";
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const gemini = genAI.getGenerativeModel({
-      model: "gemini-2.0-flash",
+      model,
       tools: [{ googleSearch: {} } as any],
     });
 
