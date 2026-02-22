@@ -9,56 +9,86 @@ export interface Trend {
   metricas: string[];
   fonte: string;
   url: string;
-  contexto: string; // trecho do conteúdo viral: descrição, caption ou primeiras linhas do roteiro
+  contexto: string;
 }
 
-// Chama um actor Apify via REST API síncrona e retorna os itens do dataset
-async function runActor(
-  actorId: string,
-  input: Record<string, unknown>,
-  token: string,
-  timeoutSecs = 40
-): Promise<unknown[]> {
-  const params = new URLSearchParams({
-    token,
-    timeout: String(timeoutSecs),
-    memory: "256",
+// ── Google Trends RSS (Brasil) — instant, no Apify ─────────────────────────
+interface GoogleTrendItem {
+  titulo: string;
+  url: string;
+  traffic: string;
+  newsTitle: string;
+  newsSnippet: string;
+  newsUrl: string;
+}
+
+function extractCDATA(xml: string, tag: string): string {
+  const cdataRe = new RegExp(`<${tag}><!\\[CDATA\\[([\\s\\S]*?)\\]\\]><\\/${tag}>`, "i");
+  const plainRe = new RegExp(`<${tag}>([^<]*)<\\/${tag}>`, "i");
+  return (cdataRe.exec(xml) || plainRe.exec(xml))?.[1]?.trim() ?? "";
+}
+
+async function fetchGoogleTrendsRSS(): Promise<GoogleTrendItem[]> {
+  const res = await fetch("https://trends.google.com/trending/rss?geo=BR", {
+    headers: {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      "Accept": "application/rss+xml, application/xml, text/xml",
+    },
+    signal: AbortSignal.timeout(8_000),
   });
 
+  if (!res.ok) throw new Error(`Google Trends RSS: ${res.status}`);
+  const xml = await res.text();
+
+  const items: GoogleTrendItem[] = [];
+  const itemRe = /<item>([\s\S]*?)<\/item>/g;
+  let m: RegExpExecArray | null;
+
+  while ((m = itemRe.exec(xml)) !== null) {
+    const chunk = m[1];
+    const titulo = extractCDATA(chunk, "title");
+    const url = extractCDATA(chunk, "link") || (/<link\s*\/?>(.*?)<\/link>/i.exec(chunk)?.[1] ?? "");
+    const traffic = extractCDATA(chunk, "ht:approx_traffic");
+    const newsTitle = extractCDATA(chunk, "ht:news_item_title");
+    const newsSnippet = extractCDATA(chunk, "ht:news_item_snippet");
+    const newsUrl = extractCDATA(chunk, "ht:news_item_url");
+
+    if (titulo) items.push({ titulo, url, traffic, newsTitle, newsSnippet, newsUrl });
+  }
+
+  return items;
+}
+
+// ── Optional YouTube via Apify (8 s timeout, best-effort) ─────────────────
+async function fetchYouTubeOptional(
+  apifyToken: string
+): Promise<unknown[]> {
+  const params = new URLSearchParams({ token: apifyToken, timeout: "8", memory: "256" });
   const res = await fetch(
-    `https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items?${params}`,
+    `https://api.apify.com/v2/acts/apify~youtube-scraper/run-sync-get-dataset-items?${params}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
-      signal: AbortSignal.timeout((timeoutSecs + 5) * 1000),
+      body: JSON.stringify({
+        searchQueries: ["finanças pessoais brasil", "médicos investimentos", "economia brasil semana"],
+        maxResults: 6,
+        proxyConfiguration: { useApifyProxy: true },
+      }),
+      signal: AbortSignal.timeout(13_000),
     }
   );
-
-  if (!res.ok) {
-    throw new Error(`Actor ${actorId} retornou ${res.status}: ${await res.text()}`);
-  }
-
+  if (!res.ok) throw new Error(`YouTube Apify: ${res.status}`);
   return res.json();
 }
 
-// Trunca array para não estourar tokens do Gemini
-function truncate<T>(arr: T[], max: number): T[] {
-  return arr.slice(0, max);
-}
+// ─────────────────────────────────────────────────────────────────────────────
 
 export async function POST() {
   try {
     const apifyToken = process.env.APIFY_API_TOKEN;
     const googleKey = process.env.GOOGLE_AI_API_KEY;
-    const googleModel = process.env.GOOGLE_TEXT_MODEL || "gemini-3-pro-preview";
+    const googleModel = process.env.GOOGLE_TEXT_MODEL || "gemini-1.5-flash";
 
-    if (!apifyToken) {
-      return NextResponse.json(
-        { error: "APIFY_API_TOKEN não configurado nas variáveis de ambiente." },
-        { status: 500 }
-      );
-    }
     if (!googleKey) {
       return NextResponse.json(
         { error: "GOOGLE_AI_API_KEY não configurado." },
@@ -66,106 +96,58 @@ export async function POST() {
       );
     }
 
-    // Roda todos os scrapers em paralelo — timeout curto para caber nos 60s do Vercel
-    const ACTOR_TIMEOUT = 20; // segundos por actor (paralelos = ~20s total, sobra ~35s pro Gemini)
-    const [googleTrendsResult, youtubeResult, tiktokResult, instagramResult] =
-      await Promise.allSettled([
-        // Google Trends Brasil
-        runActor(
-          "petr.cermak~google-trends-scraper",
-          { geo: "BR", type: "daily", limit: 20 },
-          apifyToken,
-          ACTOR_TIMEOUT
-        ),
-        // YouTube trending Brasil
-        runActor(
-          "apify~youtube-scraper",
-          {
-            searchQueries: ["trending brasil hoje", "viral brasil semana"],
-            maxResults: 10,
-            proxyConfiguration: { useApifyProxy: true },
-          },
-          apifyToken,
-          ACTOR_TIMEOUT
-        ),
-        // TikTok trending
-        runActor(
-          "clockworks~free-tiktok-scraper",
-          { type: "trending", limit: 15 },
-          apifyToken,
-          ACTOR_TIMEOUT
-        ),
-        // Instagram hashtags em alta no Brasil
-        runActor(
-          "apify~instagram-hashtag-scraper",
-          {
-            hashtags: ["brasil", "viral", "noticias"],
-            resultsPerPage: 10,
-          },
-          apifyToken,
-          ACTOR_TIMEOUT
-        ),
-      ]);
+    // Run Google Trends RSS (guaranteed fast) + YouTube (best-effort) in parallel
+    const [trendsResult, youtubeResult] = await Promise.allSettled([
+      fetchGoogleTrendsRSS(),
+      apifyToken
+        ? fetchYouTubeOptional(apifyToken)
+        : Promise.reject("no token"),
+    ]);
 
-    // Extrai resultados dos que tiveram sucesso
-    const rawData = {
-      googleTrends:
-        googleTrendsResult.status === "fulfilled"
-          ? truncate(googleTrendsResult.value, 20)
-          : null,
-      youtube:
-        youtubeResult.status === "fulfilled"
-          ? truncate(youtubeResult.value, 10)
-          : null,
-      tiktok:
-        tiktokResult.status === "fulfilled"
-          ? truncate(tiktokResult.value, 10)
-          : null,
-      instagram:
-        instagramResult.status === "fulfilled"
-          ? truncate(instagramResult.value, 10)
-          : null,
-    };
+    const googleTrends =
+      trendsResult.status === "fulfilled" ? trendsResult.value : [];
+    const youtube =
+      youtubeResult.status === "fulfilled"
+        ? (youtubeResult.value as unknown[]).slice(0, 6)
+        : [];
 
-    // Log quais fontes responderam
-    const fontesSucesso = Object.entries(rawData)
-      .filter(([, v]) => v !== null)
-      .map(([k]) => k);
-    console.log("[/api/research/trends] Fontes com dados:", fontesSucesso);
+    console.log(
+      `[/api/research/trends] Google Trends: ${googleTrends.length} items, YouTube: ${youtube.length} items`
+    );
 
-    if (fontesSucesso.length === 0) {
+    if (googleTrends.length === 0 && youtube.length === 0) {
       return NextResponse.json(
-        { error: "Nenhuma fonte de dados respondeu dentro do tempo limite. Tente novamente." },
+        { error: "Não foi possível buscar dados de tendências. Tente novamente." },
         { status: 500 }
       );
     }
 
-    // Usa Gemini para formatar os dados brutos em Trend[]
+    const rawData = { googleTrends, youtube };
+
+    // Gemini selects & formats
     const genAI = new GoogleGenerativeAI(googleKey);
     const gemini = genAI.getGenerativeModel({ model: googleModel });
 
-    const prompt = `Você recebeu dados reais de múltiplas fontes sobre o que está em alta no Brasil agora.
-Seu trabalho é filtrar e retornar SOMENTE os trending topics relevantes para o nicho de finanças pessoais e medicina.
+    const prompt = `Você recebeu dados reais sobre o que está em alta no Brasil agora.
 
-NICHO: Médicos brasileiros + finanças pessoais + investimentos + saúde financeira
-TEMAS RELEVANTES: economia, mercado financeiro, investimentos, IR, imposto de renda, PGBL, VGBL, previdência privada, renda passiva, imóveis, tesouro direto, bolsa de valores, dólar, inflação, médicos, medicina, residência médica, plantão, CRM, saúde, hospital, plano de saúde, concurso público, salário de médico, dívidas, juros, banco, fintech, criptomoeda, bitcoin, reforma tributária, reforma trabalhista, INSS, aposentadoria, CLT, PJ, MEI.
+DADOS:
+${JSON.stringify(rawData, null, 2).slice(0, 10000)}
 
-DADOS BRUTOS:
-${JSON.stringify(rawData, null, 2).slice(0, 12000)}
+NICHO DO USUÁRIO: Médicos brasileiros + finanças pessoais + investimentos + saúde financeira.
+TEMAS PRIORITÁRIOS: economia, mercado, investimentos, IR, PGBL, previdência, imóveis, bolsa, dólar, inflação, médicos, medicina, saúde, hospital, concurso, criptomoeda, reforma tributária, INSS, aposentadoria, juros, banco.
 
-REGRAS:
-1. PRIORIZE tópicos do nicho (finanças, economia, medicina, saúde, investimentos, mercado, IR, cripto)
-2. SEMPRE retorne exatamente 10 tópicos — se não houver 10 do nicho, complete com os trending topics de maior volume dos dados, independente do tema
-3. Use APENAS dados presentes nos resultados — não invente tópicos
-4. Extraia métricas reais dos dados (views, likes, buscas, posição no ranking)
-5. titulo: manchete/tema exatamente como está no dado bruto
-6. plataforma: qual plataforma forneceu o dado ("Google Trends", "YouTube", "TikTok", "Instagram")
-7. metricas: array com 2-4 strings de métricas REAIS extraídas dos dados (views, likes, buscas, posição)
-8. fonte: nome do veículo/plataforma
-9. url: URL real do item (use a URL do vídeo, post ou busca se disponível nos dados)
-10. contexto: trecho REAL do conteúdo viral — para YouTube use o título completo + descrição (primeiros 300 chars); para TikTok use o caption/texto do vídeo; para Instagram use a legenda do post; para Google Trends use as queries relacionadas mais buscadas. Máximo 400 caracteres. Este campo é OBRIGATÓRIO — é o que o copywriter vai usar para entender o que viralizou.
+TAREFA: Selecione e formate exatamente 10 trending topics seguindo estas regras:
+1. PRIORIZE tópicos do nicho acima
+2. Complete até 10 com os de maior volume de busca (campo "traffic"), independente do tema
+3. Use APENAS dados dos resultados acima — não invente
+4. titulo: exatamente como está nos dados (sem reescrever)
+5. plataforma: "Google Trends" ou "YouTube"
+6. metricas: 1-3 strings reais (ex: "500.000+ buscas", "#3 no YouTube", "1.2M views")
+7. fonte: nome da notícia associada ou "Google Trends Brasil"
+8. url: URL da notícia (newsUrl) ou do vídeo
+9. contexto: 1-2 frases resumindo O QUE está acontecendo e POR QUÊ está em alta (use newsTitle + newsSnippet dos dados). Máx 300 chars.
 
-Retorne apenas o array JSON com até 10 objetos relevantes. Sem markdown.`;
+Retorne apenas o array JSON com 10 objetos. Sem markdown.`;
 
     const result = await gemini.generateContent(prompt);
     const text = result.response.text().trim();
@@ -173,7 +155,7 @@ Retorne apenas o array JSON com até 10 objetos relevantes. Sem markdown.`;
 
     if (!clean.startsWith("[")) {
       return NextResponse.json(
-        { error: `Gemini retornou resposta inesperada: ${clean.slice(0, 200)}` },
+        { error: `Resposta inesperada do modelo: ${clean.slice(0, 200)}` },
         { status: 500 }
       );
     }
