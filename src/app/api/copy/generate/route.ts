@@ -1,6 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
 
+export const maxDuration = 60; // segundos — necessário para geração com Claude
+
 export interface CopyIdea {
   angulo: "educativo" | "provocativo" | "storytelling";
   hook: string;
@@ -173,7 +175,7 @@ export async function POST(req: NextRequest) {
 
     const message = await client.messages.create({
       model: "claude-sonnet-4-6",
-      max_tokens: 4096,
+      max_tokens: 2048,
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: buildUserPrompt(body) }],
     });
@@ -195,9 +197,10 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(ideas);
   } catch (err) {
-    console.error("[/api/copy/generate]", err);
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[/api/copy/generate]", message);
     return NextResponse.json(
-      { error: "Erro ao gerar copy. Verifique sua conexão e tente novamente." },
+      { error: `Erro ao gerar copy: ${message}` },
       { status: 500 }
     );
   }
