@@ -139,21 +139,26 @@ export async function POST() {
     const gemini = genAI.getGenerativeModel({ model: googleModel });
 
     const prompt = `Você recebeu dados reais de múltiplas fontes sobre o que está em alta no Brasil agora.
-Analise os dados e retorne SOMENTE um array JSON com exatamente 10 trending topics.
+Seu trabalho é filtrar e retornar SOMENTE os trending topics relevantes para o nicho de finanças pessoais e medicina.
+
+NICHO: Médicos brasileiros + finanças pessoais + investimentos + saúde financeira
+TEMAS RELEVANTES: economia, mercado financeiro, investimentos, IR, imposto de renda, PGBL, VGBL, previdência privada, renda passiva, imóveis, tesouro direto, bolsa de valores, dólar, inflação, médicos, medicina, residência médica, plantão, CRM, saúde, hospital, plano de saúde, concurso público, salário de médico, dívidas, juros, banco, fintech, criptomoeda, bitcoin, reforma tributária, reforma trabalhista, INSS, aposentadoria, CLT, PJ, MEI.
 
 DADOS BRUTOS:
 ${JSON.stringify(rawData, null, 2).slice(0, 12000)}
 
 REGRAS:
-- Use APENAS dados presentes nos resultados acima — não invente
-- Extraia métricas reais dos dados (views, likes, buscas, posição no ranking)
-- titulo: manchete/tema exatamente como está no dado bruto
-- plataforma: qual plataforma forneceu o dado ("Google Trends", "YouTube", "TikTok", "Instagram")
-- metricas: array com 2-4 strings de métricas REAIS extraídas dos dados (views, likes, buscas, posição)
-- fonte: nome do veículo/plataforma
-- url: URL real do item (use a URL do vídeo, post ou busca se disponível nos dados)
+1. Filtre dos dados acima APENAS tópicos relacionados ao nicho (finanças, economia, medicina, saúde, investimentos)
+2. Se houver menos de 10 tópicos diretos do nicho, inclua tendências gerais que tenham conexão possível com finanças ou medicina
+3. Use APENAS dados presentes nos resultados — não invente tópicos
+4. Extraia métricas reais dos dados (views, likes, buscas, posição no ranking)
+5. titulo: manchete/tema exatamente como está no dado bruto
+6. plataforma: qual plataforma forneceu o dado ("Google Trends", "YouTube", "TikTok", "Instagram")
+7. metricas: array com 2-4 strings de métricas REAIS extraídas dos dados (views, likes, buscas, posição)
+8. fonte: nome do veículo/plataforma
+9. url: URL real do item (use a URL do vídeo, post ou busca se disponível nos dados)
 
-Retorne apenas o array JSON com 10 objetos. Sem markdown.`;
+Retorne apenas o array JSON com até 10 objetos relevantes. Sem markdown.`;
 
     const result = await gemini.generateContent(prompt);
     const text = result.response.text().trim();
