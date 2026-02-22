@@ -154,8 +154,8 @@ DADOS BRUTOS:
 ${JSON.stringify(rawData, null, 2).slice(0, 12000)}
 
 REGRAS:
-1. Filtre dos dados acima APENAS tópicos relacionados ao nicho (finanças, economia, medicina, saúde, investimentos)
-2. Se houver menos de 10 tópicos diretos do nicho, inclua tendências gerais que tenham conexão possível com finanças ou medicina
+1. PRIORIZE tópicos do nicho (finanças, economia, medicina, saúde, investimentos, mercado, IR, cripto)
+2. SEMPRE retorne exatamente 10 tópicos — se não houver 10 do nicho, complete com os trending topics de maior volume dos dados, independente do tema
 3. Use APENAS dados presentes nos resultados — não invente tópicos
 4. Extraia métricas reais dos dados (views, likes, buscas, posição no ranking)
 5. titulo: manchete/tema exatamente como está no dado bruto
