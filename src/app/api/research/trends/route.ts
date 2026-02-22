@@ -11,23 +11,27 @@ export interface Trend {
   url: string;          // link para a fonte original (quando disponível)
 }
 
-const PROMPT = `Pesquise o que está em alta no Brasil AGORA. Use sua capacidade de busca para encontrar os trending topics reais desta semana.
+const PROMPT = `Você é um analista de tendências digitais do Brasil. Use sua capacidade de busca para identificar o que está viral no Brasil nesta semana.
 
-Retorne SOMENTE um array JSON válido (sem markdown, sem texto adicional) com exatamente 10 trending topics brasileiros.
+Retorne SOMENTE um array JSON válido com exatamente 10 objetos. Sem markdown, sem texto antes ou depois do array.
 
-IMPORTANTE:
-- Não filtre por tema — busque o que está realmente viral no Brasil agora (economia, política, saúde, tecnologia, comportamento, qualquer tema)
-- Não adapte para médicos ou finanças — traga a manchete/tema exatamente como está circulando
-- Foque em evidências de viralização: quantos views, quantas buscas, qual o engajamento real
+REGRAS OBRIGATÓRIAS:
+- Traga temas de qualquer categoria que estejam virais agora (economia, política, saúde, tecnologia, entretenimento, comportamento)
+- NÃO filtre para médicos ou finanças — manchete exata como está circulando
+- Todos os 4 campos são OBRIGATÓRIOS em todos os 10 itens — nunca deixe vazio ou null
+- Para "metricas": se não tiver número exato, estime com base no que sabe ("estimado X milhões de views", "tendência crescente no Google Trends BR") — mas SEMPRE preencha com pelo menos 2 itens
+- Para "url": use a URL do veículo principal onde o tema está em alta (ex: "https://g1.globo.com", "https://www.tiktok.com/trending", "https://trends.google.com/trends/?geo=BR")
 
-Cada item deve ter exatamente estes campos:
-- "titulo": string — o tema/manchete exatamente como está em alta (não adapte)
-- "plataforma": string — onde está mais em alta ("Instagram", "YouTube", "TikTok", "LinkedIn", "Twitter", "Google Trends", "Portais de Notícia")
-- "metricas": array de strings — evidências concretas de viralização que você encontrou, como: número de views, quantidade de buscas, posição no Google Trends, número de publicações, engajamento em posts (ex: "3,2M views no TikTok em 48h", "Top 5 Google Trends BR nesta semana", "12.000 posts no Instagram com a hashtag", "450k compartilhamentos no WhatsApp segundo dados do Twitter")
-- "fonte": string — nome do veículo ou plataforma onde você encontrou os dados (ex: "Google Trends", "InfoMoney", "Folha de S.Paulo", "TikTok", "G1")
-- "url": string — link direto para a fonte onde os dados podem ser verificados (se não encontrar URL específica, use a URL principal do veículo)
+Estrutura obrigatória de cada item:
+{
+  "titulo": "manchete ou tema exatamente como está em alta no Brasil",
+  "plataforma": "Instagram" | "YouTube" | "TikTok" | "LinkedIn" | "Twitter" | "Google Trends" | "Portais de Notícia",
+  "metricas": ["métrica 1 de viralização com número ou estimativa", "métrica 2", "métrica 3"],
+  "fonte": "nome do veículo ou plataforma (ex: G1, InfoMoney, TikTok, Google Trends)",
+  "url": "https://url-da-fonte.com"
+}
 
-Retorne apenas o array JSON.`;
+Retorne apenas o array JSON com 10 itens.`;
 
 export async function POST() {
   try {

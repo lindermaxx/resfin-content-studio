@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import type { Trend } from "@/app/api/research/trends/route";
 
-const TRENDS_CACHE_KEY = "resfin_trends_cache";
+const TRENDS_CACHE_KEY = "resfin_trends_v2"; // v2 — novo formato com metricas/fonte/url
 
 export default function ResearchPage() {
   const router = useRouter();
