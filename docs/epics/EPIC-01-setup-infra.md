@@ -20,8 +20,8 @@ Criar a base técnica do projeto: repositório Next.js configurado, deploy autom
 
 ## Stories
 
-- [ ] 1.1 — Criar projeto Next.js e configurar repositório GitHub
-- [ ] 1.2 — Deploy Vercel + Vercel KV + variáveis de ambiente
+- [x] 1.1 — Criar projeto Next.js e configurar repositório GitHub
+- [x] 1.2 — Deploy Vercel + Supabase + variáveis de ambiente
 
 ## Dependências
 
