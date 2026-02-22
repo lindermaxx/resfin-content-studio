@@ -66,39 +66,44 @@ export async function POST() {
       );
     }
 
-    // Roda todos os scrapers em paralelo — usa o que completar dentro do timeout
+    // Roda todos os scrapers em paralelo — timeout curto para caber nos 60s do Vercel
+    const ACTOR_TIMEOUT = 20; // segundos por actor (paralelos = ~20s total, sobra ~35s pro Gemini)
     const [googleTrendsResult, youtubeResult, tiktokResult, instagramResult] =
       await Promise.allSettled([
         // Google Trends Brasil
         runActor(
           "petr.cermak~google-trends-scraper",
           { geo: "BR", type: "daily", limit: 20 },
-          apifyToken
+          apifyToken,
+          ACTOR_TIMEOUT
         ),
         // YouTube trending Brasil
         runActor(
           "apify~youtube-scraper",
           {
             searchQueries: ["trending brasil hoje", "viral brasil semana"],
-            maxResults: 15,
+            maxResults: 10,
             proxyConfiguration: { useApifyProxy: true },
           },
-          apifyToken
+          apifyToken,
+          ACTOR_TIMEOUT
         ),
         // TikTok trending
         runActor(
           "clockworks~free-tiktok-scraper",
-          { type: "trending", limit: 20 },
-          apifyToken
+          { type: "trending", limit: 15 },
+          apifyToken,
+          ACTOR_TIMEOUT
         ),
         // Instagram hashtags em alta no Brasil
         runActor(
           "apify~instagram-hashtag-scraper",
           {
             hashtags: ["brasil", "viral", "noticias"],
-            resultsPerPage: 15,
+            resultsPerPage: 10,
           },
-          apifyToken
+          apifyToken,
+          ACTOR_TIMEOUT
         ),
       ]);
 

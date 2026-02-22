@@ -35,9 +35,15 @@ export default function ResearchPage() {
     if (forcar) setSelectedTrend(null);
     try {
       const res = await fetch("/api/research/trends", { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erro desconhecido");
-      setTrends(data);
+      let data: unknown;
+      try {
+        data = await res.json();
+      } catch {
+        // Vercel retornou HTML (timeout ou erro 5xx) em vez de JSON
+        throw new Error("Tempo limite excedido ao buscar trends. Os scrapers demoraram mais que o esperado — tente novamente.");
+      }
+      if (!res.ok) throw new Error((data as { error?: string }).error || "Erro desconhecido");
+      setTrends(data as typeof trends);
       sessionStorage.setItem(TRENDS_CACHE_KEY, JSON.stringify(data));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao buscar trends.");
