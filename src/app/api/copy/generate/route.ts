@@ -110,7 +110,7 @@ function buildUserPrompt(req: GenerateCopyRequest): string {
 ${req.contextoViral}
 """
 ${req.metricas?.length ? `Métricas de viralização: ${req.metricas.join(" | ")}` : ""}
-Use este conteúdo para entender O QUE viralizou e POR QUÊ — mas adapte para o público médico com o método Light Copy. Não copie, inspire-se.
+ESTRATÉGIA: Entre na trend. Use a mesma estrutura, o mesmo tipo de hook e o mesmo mecanismo que fez este conteúdo viralizar — mas conte para médicos brasileiros no contexto de finanças pessoais. Mesmo formato, mesmo ritmo, realidade diferente.
 `
     : "";
 
