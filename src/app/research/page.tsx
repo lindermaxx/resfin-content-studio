@@ -54,6 +54,10 @@ export default function ResearchPage() {
           hook: null,
           rascunho: rascunho.trim(),
           source: "trend" as const,
+          contextoViral: selectedTrend.contexto || null,
+          plataforma: selectedTrend.plataforma || null,
+          metricas: selectedTrend.metricas || [],
+          url: selectedTrend.url || null,
         }
       : {
           tema: manualTema.trim(),
@@ -61,6 +65,10 @@ export default function ResearchPage() {
           hook: null,
           rascunho: rascunho.trim(),
           source: "manual" as const,
+          contextoViral: null,
+          plataforma: null,
+          metricas: [],
+          url: null,
         };
 
     sessionStorage.setItem("resfin_research_context", JSON.stringify(context));

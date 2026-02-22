@@ -9,6 +9,7 @@ export interface Trend {
   metricas: string[];
   fonte: string;
   url: string;
+  contexto: string; // trecho do conteúdo viral: descrição, caption ou primeiras linhas do roteiro
 }
 
 // Chama um actor Apify via REST API síncrona e retorna os itens do dataset
@@ -157,6 +158,7 @@ REGRAS:
 7. metricas: array com 2-4 strings de métricas REAIS extraídas dos dados (views, likes, buscas, posição)
 8. fonte: nome do veículo/plataforma
 9. url: URL real do item (use a URL do vídeo, post ou busca se disponível nos dados)
+10. contexto: trecho REAL do conteúdo viral — para YouTube use o título completo + descrição (primeiros 300 chars); para TikTok use o caption/texto do vídeo; para Instagram use a legenda do post; para Google Trends use as queries relacionadas mais buscadas. Máximo 400 caracteres. Este campo é OBRIGATÓRIO — é o que o copywriter vai usar para entender o que viralizou.
 
 Retorne apenas o array JSON com até 10 objetos relevantes. Sem markdown.`;
 

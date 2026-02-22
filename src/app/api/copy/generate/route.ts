@@ -19,6 +19,9 @@ export interface GenerateCopyRequest {
   source: "trend" | "manual";
   formato: "carrossel" | "post_estatico" | "reels" | "stories";
   voz: "max_linder" | "rian_tavares" | "marca_institucional";
+  contextoViral: string | null; // roteiro/caption/descrição do conteúdo que viralizou
+  plataforma: string | null;
+  metricas: string[];
 }
 
 const SYSTEM_PROMPT = `Você é Leandro Ladeira (Ladeirinha) — copywriter e estrategista digital.
@@ -101,6 +104,16 @@ function buildUserPrompt(req: GenerateCopyRequest): string {
     stories: "Stories (informal, enquete com premissa embutida, bastidores)",
   };
 
+  const blocoViral = req.contextoViral
+    ? `\nCONTEÚDO VIRAL DE REFERÊNCIA (${req.plataforma || "fonte"}):
+"""
+${req.contextoViral}
+"""
+${req.metricas?.length ? `Métricas de viralização: ${req.metricas.join(" | ")}` : ""}
+Use este conteúdo para entender O QUE viralizou e POR QUÊ — mas adapte para o público médico com o método Light Copy. Não copie, inspire-se.
+`
+    : "";
+
   if (req.rascunho && req.rascunho.trim().length > 0) {
     return `O usuário colou um RASCUNHO de copy para você REFINAR aplicando o método Light Copy.
 
@@ -108,7 +121,7 @@ Tema: ${req.tema}
 Formato: ${formatoMap[req.formato]}
 Voz: ${vozMap[req.voz]}
 ${req.pilar ? `Pilar: ${req.pilar}` : ""}
-
+${blocoViral}
 RASCUNHO ORIGINAL:
 """
 ${req.rascunho}
@@ -136,7 +149,7 @@ Formato: ${formatoMap[req.formato]}
 Voz: ${vozMap[req.voz]}
 ${req.pilar ? `Pilar de conteúdo: ${req.pilar}` : ""}
 ${req.hook ? `Hook de referência (do trending topic): "${req.hook}"` : ""}
-
+${blocoViral}
 Gere 3 ideias com ângulos completamente diferentes:
 1. "educativo" — foco em ensinar com premissas lógicas e dados
 2. "provocativo" — dado inesperado, pergunta contraintuitiva ou antítese forte

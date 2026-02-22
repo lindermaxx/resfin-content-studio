@@ -44,6 +44,10 @@ interface ResearchContext {
   hook: string | null;
   rascunho: string;
   source: "trend" | "manual";
+  contextoViral: string | null;
+  plataforma: string | null;
+  metricas: string[];
+  url: string | null;
 }
 
 export default function CopyPage() {
@@ -85,6 +89,9 @@ export default function CopyPage() {
           source: context.source,
           formato,
           voz,
+          contextoViral: context.contextoViral ?? null,
+          plataforma: context.plataforma ?? null,
+          metricas: context.metricas ?? [],
         } satisfies GenerateCopyRequest),
       });
 
