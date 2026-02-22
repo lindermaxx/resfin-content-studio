@@ -1,6 +1,7 @@
-import { CheckCircle } from "lucide-react";
-import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { CheckCircle, BarChart2 } from "lucide-react";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import type { Trend } from "@/app/api/research/trends/route";
 
@@ -34,7 +35,7 @@ export function TrendCard({ trend, selected, onSelect }: TrendCardProps) {
             : "hover:border-zinc-400 hover:shadow-sm"
         )}
       >
-        <CardHeader className="flex flex-col gap-3">
+        <CardHeader className="pb-2">
           <div className="flex items-start justify-between gap-2">
             <div className="flex gap-2 flex-wrap">
               <Badge variant="outline">{trend.plataforma}</Badge>
@@ -44,15 +45,41 @@ export function TrendCard({ trend, selected, onSelect }: TrendCardProps) {
               <CheckCircle className="h-5 w-5 shrink-0 text-zinc-900" />
             )}
           </div>
-          <div className="flex flex-col gap-1">
-            <CardTitle className="text-sm font-semibold leading-snug">
-              {trend.titulo}
-            </CardTitle>
-            <CardDescription className="text-xs italic leading-relaxed">
-              &ldquo;{trend.hook}&rdquo;
-            </CardDescription>
-          </div>
+          <CardTitle className="text-sm font-semibold leading-snug mt-2">
+            {trend.titulo}
+          </CardTitle>
+          <CardDescription className="text-xs italic leading-relaxed">
+            &ldquo;{trend.hook}&rdquo;
+          </CardDescription>
         </CardHeader>
+
+        {(trend.justificativa || trend.dados?.length > 0) && (
+          <CardContent className="pt-0 flex flex-col gap-2">
+            <Separator />
+
+            {trend.justificativa && (
+              <p className="text-xs text-zinc-600 leading-relaxed">
+                {trend.justificativa}
+              </p>
+            )}
+
+            {trend.dados?.length > 0 && (
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-1.5">
+                  <BarChart2 className="h-3 w-3 text-zinc-400" />
+                  <span className="text-xs font-medium text-zinc-500">Evidências</span>
+                </div>
+                <ul className="flex flex-col gap-1">
+                  {trend.dados.map((d, i) => (
+                    <li key={i} className="text-xs text-zinc-500 leading-relaxed pl-2 border-l-2 border-zinc-100">
+                      {d}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </CardContent>
+        )}
       </Card>
     </button>
   );

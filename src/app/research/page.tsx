@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Loader2, ArrowRight } from "lucide-react";
+import { Search, Loader2, ArrowRight, RefreshCw } from "lucide-react";
 import { TrendCard } from "@/components/research/TrendCard";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import type { Trend } from "@/app/api/research/trends/route";
+
+const TRENDS_CACHE_KEY = "resfin_trends_cache";
 
 export default function ResearchPage() {
   const router = useRouter();
@@ -17,17 +19,26 @@ export default function ResearchPage() {
   const [manualTema, setManualTema] = useState("");
   const [rascunho, setRascunho] = useState("");
 
+  // Restaura trends do cache ao voltar para a página
+  useEffect(() => {
+    const cached = sessionStorage.getItem(TRENDS_CACHE_KEY);
+    if (cached) {
+      try { setTrends(JSON.parse(cached)); } catch { /* ignore */ }
+    }
+  }, []);
+
   const temaSelecionado = selectedTrend !== null || manualTema.trim().length > 0;
 
-  async function buscarTrends() {
+  async function buscarTrends(forcar = false) {
     setLoading(true);
     setError(null);
-    setSelectedTrend(null);
+    if (forcar) setSelectedTrend(null);
     try {
       const res = await fetch("/api/research/trends", { method: "POST" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro desconhecido");
       setTrends(data);
+      sessionStorage.setItem(TRENDS_CACHE_KEY, JSON.stringify(data));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao buscar trends.");
     } finally {
@@ -77,23 +88,36 @@ export default function ResearchPage() {
           <h2 className="text-sm font-medium text-zinc-700">
             Trending topics da semana
           </h2>
-          <Button
-            onClick={buscarTrends}
-            disabled={loading}
-            size="sm"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Buscando...
-              </>
-            ) : (
-              <>
-                <Search className="mr-2 h-4 w-4" />
-                Buscar Trends da Semana
-              </>
+          <div className="flex gap-2">
+            {trends.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => buscarTrends(true)}
+                disabled={loading}
+              >
+                <RefreshCw className="mr-2 h-3.5 w-3.5" />
+                Atualizar
+              </Button>
             )}
-          </Button>
+            <Button
+              onClick={() => buscarTrends(false)}
+              disabled={loading}
+              size="sm"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Buscando...
+                </>
+              ) : (
+                <>
+                  <Search className="mr-2 h-4 w-4" />
+                  {trends.length === 0 ? "Buscar Trends da Semana" : "Buscar Trends da Semana"}
+                </>
+              )}
+            </Button>
+          </div>
         </div>
 
         {error && (

@@ -1,6 +1,8 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
 
+export const maxDuration = 60;
+
 export interface Trend {
   titulo: string;
   plataforma: "Instagram" | "YouTube" | "TikTok" | "LinkedIn" | "Twitter";
@@ -13,28 +15,29 @@ export interface Trend {
     | "solucoes_patrimoniais"
     | "bastidores";
   hook: string;
+  justificativa: string; // por que esse tema está em alta — baseado em dados reais
+  dados: string[];       // métricas e evidências encontradas (buscas, notícias, cobertura)
 }
 
-const PROMPT = `Você é um especialista em conteúdo para redes sociais focado em finanças pessoais e planejamento financeiro para médicos brasileiros.
+const PROMPT = `Você é um especialista em estratégia de conteúdo para redes sociais, focado em finanças pessoais e planejamento financeiro para médicos brasileiros.
 
-Retorne SOMENTE um array JSON válido (sem markdown, sem texto adicional) com exatamente 10 trending topics relevantes AGORA para o perfil @residenciaemfinancas no Instagram.
+Use sua capacidade de busca para pesquisar o que está em alta AGORA no Brasil relacionado a: finanças pessoais, investimentos, economia, planejamento financeiro, mercado imobiliário, imposto de renda, previdência, e temas relevantes para médicos de alta renda.
 
-O perfil é voltado para médicos brasileiros que querem organizar suas finanças, investir melhor e construir patrimônio.
+Retorne SOMENTE um array JSON válido (sem markdown, sem texto adicional) com exatamente 10 trending topics relevantes para o perfil @residenciaemfinancas.
 
-Cada item do array deve ter exatamente estes campos:
-- "titulo": string — tema do post (claro e específico)
-- "plataforma": string — onde o tema está em alta: "Instagram", "YouTube", "TikTok", "LinkedIn" ou "Twitter"
-- "pilar": string — um dos valores: "educacao_financeira", "investimentos_carteira", "organizacao_orcamento", "mentalidade_comportamento", "noticias_comentadas", "solucoes_patrimoniais", "bastidores"
-- "hook": string — uma frase de abertura impactante para usar no post (máximo 15 palavras)
+Cada item deve ter exatamente estes campos:
+- "titulo": string — tema específico e atual do post
+- "plataforma": string — onde o tema está mais em alta: "Instagram", "YouTube", "TikTok", "LinkedIn" ou "Twitter"
+- "pilar": string — um dos valores exatos: "educacao_financeira", "investimentos_carteira", "organizacao_orcamento", "mentalidade_comportamento", "noticias_comentadas", "solucoes_patrimoniais", "bastidores"
+- "hook": string — frase de abertura impactante para o post (máximo 15 palavras, sem imperativo)
+- "justificativa": string — 1-2 frases explicando POR QUE esse tema está em alta agora, com dados reais que você encontrou (notícias recentes, tendências de busca, cobertura de mídia, contexto econômico atual)
+- "dados": array de strings — liste 2-4 evidências concretas encontradas, como: termos em alta no Google, notícias recentes com data, dados do Banco Central, números de engajamento que encontrou, cobertura em veículos financeiros (ex: "Selic em 13,75% — pauta dominante no InfoMoney esta semana", "Busca por 'PGBL médico' cresceu em jan/2026 segundo Google Trends")
 
-Foque em temas atuais de economia brasileira, investimentos, planejamento financeiro para médicos, notícias do mercado financeiro e comportamento com dinheiro.
-
-Retorne apenas o JSON, sem explicações.`;
+Priorize temas com evidências reais encontradas nas suas buscas. Retorne apenas o JSON.`;
 
 export async function POST() {
   try {
     const apiKey = process.env.GOOGLE_AI_API_KEY;
-    const model = process.env.GOOGLE_TEXT_MODEL;
 
     if (!apiKey) {
       return NextResponse.json(
@@ -44,13 +47,22 @@ export async function POST() {
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const gemini = genAI.getGenerativeModel({ model: model || "gemini-3-pro-preview" });
+
+    // Usa gemini-2.0-flash para grounding — suporte nativo ao Google Search
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const gemini = genAI.getGenerativeModel({
+      model: "gemini-2.0-flash",
+      tools: [{ googleSearch: {} } as any],
+    });
 
     const result = await gemini.generateContent(PROMPT);
     const text = result.response.text().trim();
 
     // Remove markdown code blocks se presentes
-    const clean = text.replace(/^```json\n?/, "").replace(/\n?```$/, "").trim();
+    const clean = text
+      .replace(/^```json\n?/, "")
+      .replace(/\n?```$/, "")
+      .trim();
 
     let trends: Trend[];
     try {
@@ -71,9 +83,10 @@ export async function POST() {
 
     return NextResponse.json(trends);
   } catch (err) {
-    console.error("[/api/research/trends]", err);
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[/api/research/trends]", message);
     return NextResponse.json(
-      { error: "Erro ao buscar trending topics. Verifique sua conexão e tente novamente." },
+      { error: `Erro ao buscar trending topics: ${message}` },
       { status: 500 }
     );
   }
