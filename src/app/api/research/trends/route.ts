@@ -1,4 +1,3 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
 import type { Trend } from "@/lib/research-types";
 
@@ -14,35 +13,6 @@ interface GoogleTrendItem {
   newsTitle: string;
   newsSnippet: string;
   newsUrl: string;
-}
-
-function normalizeMetricas(value: unknown): string[] {
-  if (Array.isArray(value)) {
-    return value
-      .filter((item): item is string => typeof item === "string")
-      .map((item) => item.trim())
-      .filter(Boolean)
-      .slice(0, 3);
-  }
-  if (typeof value === "string" && value.trim()) return [value.trim()];
-  return [];
-}
-
-function normalizeTrend(value: unknown): Trend | null {
-  if (!value || typeof value !== "object") return null;
-
-  const raw = value as Partial<Record<keyof Trend, unknown>>;
-  const titulo = typeof raw.titulo === "string" ? raw.titulo.trim() : "";
-  if (!titulo) return null;
-
-  return {
-    titulo,
-    plataforma: typeof raw.plataforma === "string" ? raw.plataforma : "",
-    metricas: normalizeMetricas(raw.metricas),
-    fonte: typeof raw.fonte === "string" ? raw.fonte : "",
-    url: typeof raw.url === "string" ? raw.url : "",
-    contexto: typeof raw.contexto === "string" ? raw.contexto : "",
-  };
 }
 
 function extractCDATA(xml: string, tag: string): string {
@@ -90,7 +60,7 @@ async function runApifyActor(
   actorId: string,
   input: Record<string, unknown>,
   token: string,
-  timeoutSecs = 12
+  timeoutSecs = 8
 ): Promise<unknown[]> {
   const actorRef = actorId.replace(/\//g, "~");
   const params = new URLSearchParams({
@@ -125,11 +95,11 @@ async function fetchYouTubeOptional(
         "médicos investimentos",
         "economia brasil semana",
       ],
-      maxResults: 8,
+      maxResults: 6,
       proxyConfiguration: { useApifyProxy: true },
     },
     apifyToken,
-    10
+    8
   );
 }
 
@@ -144,14 +114,14 @@ async function fetchTikTokOptional(apifyToken: string): Promise<unknown[]> {
         "economia",
         "dinheiro",
       ],
-      resultsPerPage: 30,
+      resultsPerPage: 12,
       shouldDownloadCovers: false,
       shouldDownloadSlideshowImages: false,
       shouldDownloadSubtitles: false,
       shouldDownloadVideos: false,
     },
     apifyToken,
-    12
+    8
   );
 }
 
@@ -169,29 +139,160 @@ async function fetchInstagramOptional(apifyToken: string): Promise<unknown[]> {
         "medcof",
       ],
       resultsType: "posts",
-      resultsLimit: 40,
+      resultsLimit: 18,
     },
     apifyToken,
-    15
+    8
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+function toNumber(value: unknown): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const clean = value.replace(/[^\d.-]/g, "");
+    const n = Number(clean);
+    return Number.isFinite(n) ? n : 0;
+  }
+  return 0;
+}
+
+function buildMetricas(values: string[]): string[] {
+  return values.map((v) => v.trim()).filter(Boolean).slice(0, 3);
+}
+
+function mergeUniqueTrends(lists: Trend[][]): Trend[] {
+  const seen = new Set<string>();
+  const out: Trend[] = [];
+
+  for (const list of lists) {
+    for (const trend of list) {
+      const key = `${trend.plataforma}|${trend.url || trend.titulo}`.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(trend);
+    }
+  }
+  return out;
+}
+
+function mapGoogleTrends(items: GoogleTrendItem[]): Trend[] {
+  return items.map((item) => ({
+    titulo: item.titulo,
+    plataforma: "Google Trends",
+    metricas: buildMetricas([
+      item.traffic ? `${item.traffic} buscas` : "",
+    ]),
+    fonte: item.newsTitle || "Google Trends Brasil",
+    url: item.newsUrl || item.url || "",
+    contexto: item.newsSnippet || "Tema em alta nas buscas do Google Brasil.",
+  }));
+}
+
+function mapInstagram(items: unknown[]): Trend[] {
+  return (items as Record<string, unknown>[])
+    .map((item) => {
+      const likes = toNumber(item.likesCount);
+      const comments = toNumber(item.commentsCount);
+      const views = toNumber(item.videoViewCount);
+      const caption = ((item.caption as string) || "").trim();
+      const owner = ((item.ownerUsername as string) || "").trim();
+      const titulo = caption.slice(0, 90) || `Post de @${owner || "instagram"}`;
+      const contexto = caption || "Post com alta interação no Instagram.";
+      const score = likes + comments * 5 + Math.round(views * 0.05);
+
+      return {
+        trend: {
+          titulo,
+          plataforma: "Instagram",
+          metricas: buildMetricas([
+            likes > 0 ? `${likes.toLocaleString("pt-BR")} likes` : "",
+            comments > 0 ? `${comments.toLocaleString("pt-BR")} comentários` : "",
+            views > 0 ? `${views.toLocaleString("pt-BR")} views` : "",
+          ]),
+          fonte: owner ? `@${owner}` : "Instagram",
+          url: (item.url as string) || "",
+          contexto,
+        } satisfies Trend,
+        score,
+      };
+    })
+    .sort((a, b) => b.score - a.score)
+    .map((entry) => entry.trend)
+    .slice(0, 8);
+}
+
+function mapTikTok(items: unknown[]): Trend[] {
+  return (items as Record<string, unknown>[])
+    .map((item) => {
+      const likes = toNumber(item.diggCount);
+      const comments = toNumber(item.commentCount);
+      const views = toNumber(item.playCount);
+      const text = ((item.text as string) || "").trim();
+      const authorMeta = item.authorMeta as Record<string, unknown> | undefined;
+      const author =
+        ((authorMeta?.name as string) || (authorMeta?.nickName as string) || "").trim();
+      const titulo = text.slice(0, 90) || `Vídeo de @${author || "tiktok"}`;
+      const contexto = text || "Vídeo com alta tração no TikTok.";
+      const score = likes + comments * 5 + Math.round(views * 0.02);
+
+      return {
+        trend: {
+          titulo,
+          plataforma: "TikTok",
+          metricas: buildMetricas([
+            views > 0 ? `${views.toLocaleString("pt-BR")} views` : "",
+            likes > 0 ? `${likes.toLocaleString("pt-BR")} likes` : "",
+            comments > 0 ? `${comments.toLocaleString("pt-BR")} comentários` : "",
+          ]),
+          fonte: author ? `@${author}` : "TikTok",
+          url: ((item.webVideoUrl as string) || (item.videoUrl as string) || "").trim(),
+          contexto,
+        } satisfies Trend,
+        score,
+      };
+    })
+    .sort((a, b) => b.score - a.score)
+    .map((entry) => entry.trend)
+    .slice(0, 8);
+}
+
+function mapYouTube(items: unknown[]): Trend[] {
+  return (items as Record<string, unknown>[])
+    .map((item) => {
+      const views = toNumber(item.viewCount);
+      const likes = toNumber(item.likeCount);
+      const title = ((item.title as string) || "").trim();
+      const channel = ((item.channelName as string) || "").trim();
+      const description = ((item.description as string) || "").trim();
+      const score = views + likes * 10;
+
+      return {
+        trend: {
+          titulo: title || "Vídeo em alta no YouTube",
+          plataforma: "YouTube",
+          metricas: buildMetricas([
+            views > 0 ? `${views.toLocaleString("pt-BR")} views` : "",
+            likes > 0 ? `${likes.toLocaleString("pt-BR")} likes` : "",
+          ]),
+          fonte: channel || "YouTube",
+          url: ((item.url as string) || "").trim(),
+          contexto: description.slice(0, 280) || "Vídeo com alta atenção no YouTube.",
+        } satisfies Trend,
+        score,
+      };
+    })
+    .sort((a, b) => b.score - a.score)
+    .map((entry) => entry.trend)
+    .slice(0, 6);
+}
+
 export async function POST() {
   try {
     const apifyToken = process.env.APIFY_API_TOKEN;
-    const googleKey = process.env.GOOGLE_AI_API_KEY;
-    const googleModel = process.env.GOOGLE_TEXT_MODEL || "gemini-1.5-flash";
 
-    if (!googleKey) {
-      return NextResponse.json(
-        { error: "GOOGLE_AI_API_KEY não configurado." },
-        { status: 500 }
-      );
-    }
-
-    // Run all sources in parallel, prioritizing social networks
+    // Run all sources in parallel with hard limits
     const [trendsResult, youtubeResult, tiktokResult, instagramResult] = await Promise.allSettled([
       fetchGoogleTrendsRSS(),
       apifyToken
@@ -209,15 +310,15 @@ export async function POST() {
       trendsResult.status === "fulfilled" ? trendsResult.value : [];
     const youtube =
       youtubeResult.status === "fulfilled"
-        ? truncate(youtubeResult.value as unknown[], 8)
+        ? truncate(youtubeResult.value as unknown[], 6)
         : [];
     const tiktok =
       tiktokResult.status === "fulfilled"
-        ? truncate(tiktokResult.value as unknown[], 14)
+        ? truncate(tiktokResult.value as unknown[], 12)
         : [];
     const instagram =
       instagramResult.status === "fulfilled"
-        ? truncate(instagramResult.value as unknown[], 14)
+        ? truncate(instagramResult.value as unknown[], 12)
         : [];
 
     if (trendsResult.status === "rejected") {
@@ -249,72 +350,17 @@ export async function POST() {
       );
     }
 
-    const socialCount = instagram.length + tiktok.length;
-    const socialQuota =
-      socialCount >= 8 ? 7 :
-      socialCount >= 4 ? 4 :
-      socialCount >= 2 ? 2 :
-      0;
+    const instagramTrends = mapInstagram(instagram);
+    const tiktokTrends = mapTikTok(tiktok);
+    const youtubeTrends = mapYouTube(youtube);
+    const googleTrendsMapped = mapGoogleTrends(truncate(googleTrends, 8));
 
-    const rawData = {
-      instagram,
-      tiktok,
-      youtube,
-      googleTrends: socialCount > 0 ? truncate(googleTrends, 6) : googleTrends,
-    };
+    const socialTrends = mergeUniqueTrends([instagramTrends, tiktokTrends]);
+    const nonSocialTrends = mergeUniqueTrends([youtubeTrends, googleTrendsMapped]);
 
-    // Gemini selects & formats
-    const genAI = new GoogleGenerativeAI(googleKey);
-    const gemini = genAI.getGenerativeModel({ model: googleModel });
-
-    const prompt = `Você recebeu dados reais sobre o que está em alta no Brasil agora.
-
-DADOS:
-${JSON.stringify(rawData, null, 2).slice(0, 10000)}
-
-NICHO DO USUÁRIO: Médicos brasileiros + finanças pessoais + investimentos + saúde financeira.
-TEMAS PRIORITÁRIOS: economia, mercado, investimentos, IR, PGBL, previdência, imóveis, bolsa, dólar, inflação, médicos, medicina, saúde, hospital, concurso, criptomoeda, reforma tributária, INSS, aposentadoria, juros, banco.
-
-TAREFA: Selecione e formate exatamente 10 trending topics seguindo estas regras:
-1. PRIORIDADE MÁXIMA: Instagram e TikTok
-2. Se existirem dados suficientes, retorne no mínimo ${socialQuota} itens vindos de Instagram/TikTok
-3. Use YouTube e Google Trends apenas como complemento para fechar 10 itens
-4. Use APENAS dados dos resultados acima — não invente
-5. titulo: exatamente como está nos dados (sem reescrever)
-6. plataforma: "Instagram", "TikTok", "YouTube" ou "Google Trends"
-7. metricas: 1-3 strings reais (ex: "500.000+ buscas", "#3 no YouTube", "1.2M views")
-8. fonte: nome da notícia associada ou "Google Trends Brasil"
-9. url: URL real do post/vídeo/notícia
-10. contexto: 1-2 frases resumindo O QUE está acontecendo e POR QUÊ está em alta (use newsTitle + newsSnippet dos dados). Máx 300 chars.
-
-Retorne apenas o array JSON com 10 objetos. Sem markdown.`;
-
-    const result = await gemini.generateContent(prompt);
-    const text = result.response.text().trim();
-    const clean = text.replace(/^```json\n?/, "").replace(/\n?```$/, "").trim();
-
-    if (!clean.startsWith("[")) {
-      return NextResponse.json(
-        { error: `Resposta inesperada do modelo: ${clean.slice(0, 200)}` },
-        { status: 500 }
-      );
-    }
-
-    let trends: Trend[];
-    try {
-      const parsed = JSON.parse(clean);
-      if (!Array.isArray(parsed)) {
-        throw new Error("Resposta fora do formato esperado (array).");
-      }
-      trends = parsed
-        .map((item) => normalizeTrend(item))
-        .filter((item): item is Trend => item !== null);
-    } catch {
-      return NextResponse.json(
-        { error: "Erro ao processar os dados. Tente novamente." },
-        { status: 500 }
-      );
-    }
+    const trends = socialTrends.length > 0
+      ? mergeUniqueTrends([truncate(socialTrends, 8), nonSocialTrends, socialTrends.slice(8)]).slice(0, 10)
+      : truncate(nonSocialTrends, 10);
 
     return NextResponse.json(trends);
   } catch (err) {
