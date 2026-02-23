@@ -34,6 +34,40 @@ function daysAgo(iso: string): string {
   return d === 0 ? "hoje" : d === 1 ? "ontem" : `${d}d atrás`;
 }
 
+function normalizeMetricas(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value
+      .filter((item): item is string => typeof item === "string")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+  if (typeof value === "string" && value.trim()) return [value.trim()];
+  return [];
+}
+
+function normalizeTrend(value: unknown): Trend | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Partial<Record<keyof Trend, unknown>>;
+  const titulo = typeof raw.titulo === "string" ? raw.titulo.trim() : "";
+  if (!titulo) return null;
+
+  return {
+    titulo,
+    plataforma: typeof raw.plataforma === "string" ? raw.plataforma : "",
+    metricas: normalizeMetricas(raw.metricas),
+    fonte: typeof raw.fonte === "string" ? raw.fonte : "",
+    url: typeof raw.url === "string" ? raw.url : "",
+    contexto: typeof raw.contexto === "string" ? raw.contexto : "",
+  };
+}
+
+function normalizeTrendsPayload(value: unknown): Trend[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => normalizeTrend(item))
+    .filter((item): item is Trend => item !== null);
+}
+
 export default function ResearchPage() {
   const router = useRouter();
 
@@ -66,7 +100,13 @@ export default function ResearchPage() {
   // Load cache + profiles from localStorage
   useEffect(() => {
     const cached = sessionStorage.getItem(TRENDS_CACHE_KEY);
-    if (cached) { try { setTrends(JSON.parse(cached)); } catch { /* */ } }
+    if (cached) {
+      try {
+        setTrends(normalizeTrendsPayload(JSON.parse(cached)));
+      } catch {
+        // ignore invalid cache format
+      }
+    }
     const stored = localStorage.getItem(PROFILES_KEY);
     if (stored) { try { setProfiles(JSON.parse(stored)); } catch { /* */ } }
   }, []);
@@ -85,8 +125,9 @@ export default function ResearchPage() {
         throw new Error("Tempo limite excedido ao buscar trends — tente novamente.");
       }
       if (!res.ok) throw new Error((data as { error?: string }).error || "Erro desconhecido");
-      setTrends(data as typeof trends);
-      sessionStorage.setItem(TRENDS_CACHE_KEY, JSON.stringify(data));
+      const normalized = normalizeTrendsPayload(data);
+      setTrends(normalized);
+      sessionStorage.setItem(TRENDS_CACHE_KEY, JSON.stringify(normalized));
     } catch (err) {
       setTrendsError(err instanceof Error ? err.message : "Erro ao buscar trends.");
     } finally {

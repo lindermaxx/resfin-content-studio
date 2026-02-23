@@ -50,6 +50,36 @@ interface ResearchContext {
   url: string | null;
 }
 
+function normalizeMetricas(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value
+      .filter((item): item is string => typeof item === "string")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+  if (typeof value === "string" && value.trim()) return [value.trim()];
+  return [];
+}
+
+function normalizeResearchContext(value: unknown): ResearchContext | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Partial<Record<keyof ResearchContext, unknown>>;
+  const tema = typeof raw.tema === "string" ? raw.tema.trim() : "";
+  if (!tema) return null;
+
+  return {
+    tema,
+    pilar: typeof raw.pilar === "string" ? raw.pilar : null,
+    hook: typeof raw.hook === "string" ? raw.hook : null,
+    rascunho: typeof raw.rascunho === "string" ? raw.rascunho : "",
+    source: raw.source === "trend" ? "trend" : "manual",
+    contextoViral: typeof raw.contextoViral === "string" ? raw.contextoViral : null,
+    plataforma: typeof raw.plataforma === "string" ? raw.plataforma : null,
+    metricas: normalizeMetricas(raw.metricas),
+    url: typeof raw.url === "string" ? raw.url : null,
+  };
+}
+
 export default function CopyPage() {
   const router = useRouter();
   const [context, setContext] = useState<ResearchContext | null>(null);
@@ -64,7 +94,7 @@ export default function CopyPage() {
     const raw = sessionStorage.getItem("resfin_research_context");
     if (raw) {
       try {
-        setContext(JSON.parse(raw));
+        setContext(normalizeResearchContext(JSON.parse(raw)));
       } catch {
         // ignore
       }

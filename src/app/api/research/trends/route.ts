@@ -16,6 +16,35 @@ interface GoogleTrendItem {
   newsUrl: string;
 }
 
+function normalizeMetricas(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value
+      .filter((item): item is string => typeof item === "string")
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .slice(0, 3);
+  }
+  if (typeof value === "string" && value.trim()) return [value.trim()];
+  return [];
+}
+
+function normalizeTrend(value: unknown): Trend | null {
+  if (!value || typeof value !== "object") return null;
+
+  const raw = value as Partial<Record<keyof Trend, unknown>>;
+  const titulo = typeof raw.titulo === "string" ? raw.titulo.trim() : "";
+  if (!titulo) return null;
+
+  return {
+    titulo,
+    plataforma: typeof raw.plataforma === "string" ? raw.plataforma : "",
+    metricas: normalizeMetricas(raw.metricas),
+    fonte: typeof raw.fonte === "string" ? raw.fonte : "",
+    url: typeof raw.url === "string" ? raw.url : "",
+    contexto: typeof raw.contexto === "string" ? raw.contexto : "",
+  };
+}
+
 function extractCDATA(xml: string, tag: string): string {
   const cdataRe = new RegExp(`<${tag}><!\\[CDATA\\[([\\s\\S]*?)\\]\\]><\\/${tag}>`, "i");
   const plainRe = new RegExp(`<${tag}>([^<]*)<\\/${tag}>`, "i");
@@ -156,7 +185,13 @@ Retorne apenas o array JSON com 10 objetos. Sem markdown.`;
 
     let trends: Trend[];
     try {
-      trends = JSON.parse(clean);
+      const parsed = JSON.parse(clean);
+      if (!Array.isArray(parsed)) {
+        throw new Error("Resposta fora do formato esperado (array).");
+      }
+      trends = parsed
+        .map((item) => normalizeTrend(item))
+        .filter((item): item is Trend => item !== null);
     } catch {
       return NextResponse.json(
         { error: "Erro ao processar os dados. Tente novamente." },

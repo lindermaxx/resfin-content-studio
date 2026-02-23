@@ -12,6 +12,8 @@ interface TrendCardProps {
 }
 
 export function TrendCard({ trend, selected, onSelect }: TrendCardProps) {
+  const metricas = Array.isArray(trend.metricas) ? trend.metricas : [];
+
   return (
     <div className={cn(
       "rounded-xl border transition-all",
@@ -35,7 +37,7 @@ export function TrendCard({ trend, selected, onSelect }: TrendCardProps) {
             </CardTitle>
           </CardHeader>
 
-          {trend.metricas?.length > 0 && (
+          {metricas.length > 0 && (
             <CardContent className="pt-0 pb-3">
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-center gap-1.5">
@@ -43,7 +45,7 @@ export function TrendCard({ trend, selected, onSelect }: TrendCardProps) {
                   <span className="text-xs font-medium text-zinc-500">Viralização</span>
                 </div>
                 <ul className="flex flex-col gap-1">
-                  {trend.metricas.map((m, i) => (
+                  {metricas.map((m, i) => (
                     <li
                       key={i}
                       className="text-xs text-zinc-600 leading-relaxed pl-2 border-l-2 border-zinc-100"
