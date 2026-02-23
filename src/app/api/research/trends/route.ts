@@ -119,18 +119,28 @@ async function runApifyFallback(
 
 // ── Instagram-only trends via Apify (cost control mode) ────────────────────
 async function fetchInstagramOptional(apifyToken: string, failures?: string[]): Promise<unknown[]> {
-  return runApifyFallback(apifyToken, [
-    {
+  const batchSize = 4;
+  const hashtagBatches: string[][] = [];
+
+  for (let i = 0; i < INSTAGRAM_HASHTAGS.length; i += batchSize) {
+    hashtagBatches.push(INSTAGRAM_HASHTAGS.slice(i, i + batchSize));
+  }
+
+  return runApifyFallback(
+    apifyToken,
+    hashtagBatches.map((batch) => ({
       actorId: "apify/instagram-scraper",
       input: {
-        directUrls: INSTAGRAM_HASHTAGS
-          .slice(0, 15)
-          .map((tag) => `https://www.instagram.com/explore/tags/${encodeURIComponent(tag)}/`),
-        resultsLimit: 24,
+        directUrls: batch.map(
+          (tag) =>
+            `https://www.instagram.com/explore/tags/${encodeURIComponent(tag)}/`
+        ),
+        resultsLimit: 16,
       },
-      timeoutSecs: 10,
-    },
-  ], failures);
+      timeoutSecs: 8,
+    })),
+    failures
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
