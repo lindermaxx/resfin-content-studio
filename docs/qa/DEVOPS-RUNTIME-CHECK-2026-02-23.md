@@ -34,6 +34,21 @@ Agent: @devops
 - `vercel whoami` failed with `No existing credentials found`.
 - No local `.vercel/project.json` present.
 
+## Follow-up (same date)
+
+After commit `5692350`:
+- GitHub status `Vercel`: **success** (`Deployment has completed`).
+- Production UI updated:
+  - `/pipeline` now renders new Kanban UI (not placeholder).
+  - `/image` no longer serves old placeholder page.
+- Production API routes for EPIC-05 are now published:
+  - `POST /api/image/generate` responds from new route.
+  - `PATCH /api/posts/:id/image` responds from new route.
+
+Remaining blocker after deploy fix:
+- All post/image endpoints still fail due missing DB schema in production Supabase:
+  - `Could not find the table 'public.posts' in the schema cache`
+
 ## Required Actions (Ops)
 
 1. Authenticate Vercel CLI or trigger deploy via dashboard.
