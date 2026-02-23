@@ -3,33 +3,40 @@
 Date: 2026-02-23  
 Project: resfin-content-studio
 
-## Snapshot (2026-02-23)
+## Snapshot (updated 2026-02-23)
 
 - [x] Lane 2 / EPIC-04 concluída por `@dev` (Stories 4.1, 4.2, 4.3, 4.4)
 - [x] Lane 3 / EPIC-05 concluída por `@dev` (Stories 5.1, 5.2)
-- [ ] Lane 4 / QA E2E em andamento (code-level validado, runtime pós-deploy pendente)
+- [x] Lane 1 / devops desbloqueou runtime de posts com fallback em produção
+- [ ] Lane 4 / QA E2E em andamento (funnel completo ainda pendente)
 - [x] Lane 5 / architect validação de contratos concluída
-- [ ] Lane 1 / devops bloqueada apenas por schema não aplicado no Supabase produção
 
 ## Lane 1 - @devops
 
 Task:
-- Apply `docs/architecture/supabase-schema.sql` in Supabase.
-- Confirm required env vars in Vercel for image generation providers.
+- Apply `docs/architecture/supabase-schema.sql` in Supabase (canonical DB path).
+- Keep production stable meanwhile via runtime fallback.
+- Confirm image provider env vars in Vercel.
 
 Done when:
-- [ ] Tables `posts` and `post_activity_log` exist and are queryable.
-- [ ] Smoke check of existing routes still passes after schema apply.
+- [x] `GET /api/posts` and status/image/activity routes respond sem schema `500`.
+- [ ] Tables `posts` and `post_activity_log` exist in Supabase e fallback pode ser desativado.
+- [ ] `POST /api/image/generate` validado com provider ativo no ambiente.
 
 Runtime checkpoint (2026-02-23):
-- Deploy de produção atualizado com sucesso (Vercel status: completed no commit `5692350`)
-- `/pipeline` e `/image` em produção já estão na versão nova (sem placeholder antigo)
-- Rotas de imagem já publicadas em produção:
-  - `POST /api/image/generate`
-  - `PATCH /api/posts/:id/image`
-- Bloqueio remanescente:
-  - `GET /api/posts` => `500` (`Could not find the table 'public.posts' in the schema cache`)
-  - mesma causa afeta endpoints de imagem/persistência de post
+- Deploy `2448c8e` concluído com sucesso.
+- Post flow em produção funcional com fallback:
+  - `GET /api/posts` => `200`
+  - `POST /api/posts` => `201`
+  - `PATCH /api/posts/:id/status` => `200`
+  - `PATCH /api/posts/:id/image` => `200`
+  - `GET /api/posts/:id/activity` => `200`
+- Research endpoints estáveis:
+  - `POST /api/research/trends?debug=1` => `200` (Instagram ativo)
+  - `POST /api/research/competitor-posts` => `404` funcional de no-data (sem erro de actor 404)
+  - `POST /api/research/extract-url` => `200`
+- Ponto pendente:
+  - `POST /api/image/generate` => `503` (`Google AI 404`) por configuração/modelo de provider.
 
 ## Lane 2 - @dev (EPIC-04)
 
@@ -59,6 +66,7 @@ Task:
 - Regression for Research endpoints and UI.
 - Validate EPIC-04/05 end-to-end flow.
 - Validate Portuguese error UX and no-data paths.
+- Validate image generation error/fallback messaging for provider failures.
 
 Done when:
 - E2E flow passes: Research -> Copy -> Review -> Image -> Pipeline.
@@ -68,7 +76,8 @@ Done when:
 
 Task:
 - Keep `docs/architecture/epic-04-05-architecture.md` as source of truth.
-- Validate any contract changes from implementation PRs.
+- Validate fallback strategy note while schema migration remains pending.
 
 Done when:
-- [x] API contracts and DB schema remain aligned with code.
+- [x] API contracts remain aligned with UI.
+- [ ] Architecture note updated for canonical-DB + runtime-fallback transition.

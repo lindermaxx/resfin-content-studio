@@ -3,7 +3,7 @@ import type { Trend } from "@/lib/research-types";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
-const BUILD_TAG = "trends-social-v6";
+const BUILD_TAG = "trends-instagram-only-v1";
 
 export type { Trend };
 
@@ -25,59 +25,6 @@ const DEFAULT_INSTAGRAM_HASHTAGS = [
   "liberdadefinanceira",
 ];
 
-const DEFAULT_TIKTOK_HASHTAGS = [
-  "financaspessoais",
-  "investimentos",
-  "educacaofinanceira",
-  "planejamentofinanceiro",
-  "independenciafinanceira",
-  "reservadeemergencia",
-  "tesouredireto",
-  "fundosimobiliarios",
-  "acoes",
-  "rendavariavel",
-  "rendafixa",
-  "dividendos",
-  "financas",
-  "dinheiro",
-  "liberdadefinanceira",
-];
-
-const DEFAULT_SEED_ACCOUNTS = [
-  "me_poupe",
-  "oracoesfinanceiras",
-  "gustavo_cerbasi",
-  "investindocomcarol",
-  "thalitareis",
-  "leandro_ramos_",
-  "nathfinancas",
-  "ricardolino",
-  "primo_rico",
-];
-
-const DEFAULT_KEYWORDS = [
-  "reserva de emergência",
-  "carteira de investimentos",
-  "renda passiva",
-  "aportar",
-  "CDB",
-  "LCI",
-  "LCA",
-  "tesouro direto",
-  "FII",
-  "dividendos",
-  "juros compostos",
-  "inflação",
-  "IPCA",
-  "dívida",
-  "orçamento",
-  "planilha",
-  "aposentadoria",
-  "PGBL",
-  "VGBL",
-  "previdência",
-];
-
 function parseList(value: string | undefined, fallback: string[]): string[] {
   if (!value?.trim()) return fallback;
   const items = value
@@ -93,75 +40,10 @@ function parseHashtags(value: string | undefined, fallback: string[]): string[] 
     .filter(Boolean);
 }
 
-function parseSeedAccounts(value: string | undefined, fallback: string[]): string[] {
-  return parseList(value, fallback)
-    .map((account) => account.replace(/^@/, "").replace(/\s+/g, ""))
-    .filter(Boolean);
-}
-
 const INSTAGRAM_HASHTAGS = parseHashtags(
   process.env.RESEARCH_INSTAGRAM_HASHTAGS,
   DEFAULT_INSTAGRAM_HASHTAGS
 );
-const TIKTOK_HASHTAGS = parseHashtags(
-  process.env.RESEARCH_TIKTOK_HASHTAGS,
-  DEFAULT_TIKTOK_HASHTAGS
-);
-const SEED_ACCOUNTS = parseSeedAccounts(
-  process.env.RESEARCH_SEED_ACCOUNTS,
-  DEFAULT_SEED_ACCOUNTS
-);
-const KEYWORDS = parseList(
-  process.env.RESEARCH_KEYWORDS,
-  DEFAULT_KEYWORDS
-);
-
-// ── Google Trends RSS (Brasil) — instant, no Apify ─────────────────────────
-interface GoogleTrendItem {
-  titulo: string;
-  url: string;
-  traffic: string;
-  newsTitle: string;
-  newsSnippet: string;
-  newsUrl: string;
-}
-
-function extractCDATA(xml: string, tag: string): string {
-  const cdataRe = new RegExp(`<${tag}><!\\[CDATA\\[([\\s\\S]*?)\\]\\]><\\/${tag}>`, "i");
-  const plainRe = new RegExp(`<${tag}>([^<]*)<\\/${tag}>`, "i");
-  return (cdataRe.exec(xml) || plainRe.exec(xml))?.[1]?.trim() ?? "";
-}
-
-async function fetchGoogleTrendsRSS(): Promise<GoogleTrendItem[]> {
-  const res = await fetch("https://trends.google.com/trending/rss?geo=BR", {
-    headers: {
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-      "Accept": "application/rss+xml, application/xml, text/xml",
-    },
-    signal: AbortSignal.timeout(8_000),
-  });
-
-  if (!res.ok) throw new Error(`Google Trends RSS: ${res.status}`);
-  const xml = await res.text();
-
-  const items: GoogleTrendItem[] = [];
-  const itemRe = /<item>([\s\S]*?)<\/item>/g;
-  let m: RegExpExecArray | null;
-
-  while ((m = itemRe.exec(xml)) !== null) {
-    const chunk = m[1];
-    const titulo = extractCDATA(chunk, "title");
-    const url = extractCDATA(chunk, "link") || (/<link\s*\/?>(.*?)<\/link>/i.exec(chunk)?.[1] ?? "");
-    const traffic = extractCDATA(chunk, "ht:approx_traffic");
-    const newsTitle = extractCDATA(chunk, "ht:news_item_title");
-    const newsSnippet = extractCDATA(chunk, "ht:news_item_snippet");
-    const newsUrl = extractCDATA(chunk, "ht:news_item_url");
-
-    if (titulo) items.push({ titulo, url, traffic, newsTitle, newsSnippet, newsUrl });
-  }
-
-  return items;
-}
 
 function truncate<T>(arr: T[], max: number): T[] {
   return arr.slice(0, max);
@@ -235,53 +117,16 @@ async function runApifyFallback(
   return [];
 }
 
-// ── Optional social trends via Apify (best-effort) ─────────────────────────
-async function fetchYouTubeOptional(
-  apifyToken: string,
-  failures?: string[]
-): Promise<unknown[]> {
-  void apifyToken;
-  void failures;
-  return [];
-}
-
-async function fetchTikTokOptional(apifyToken: string, failures?: string[]): Promise<unknown[]> {
-  return runApifyFallback(apifyToken, [
-    {
-      actorId: "clockworks/free-tiktok-scraper",
-      input: {
-        hashtags: TIKTOK_HASHTAGS,
-        resultsPerPage: 18,
-        shouldDownloadCovers: false,
-        shouldDownloadSlideshowImages: false,
-        shouldDownloadSubtitles: false,
-        shouldDownloadVideos: false,
-      },
-      timeoutSecs: 6,
-    },
-  ], failures);
-}
-
+// ── Instagram-only trends via Apify (cost control mode) ────────────────────
 async function fetchInstagramOptional(apifyToken: string, failures?: string[]): Promise<unknown[]> {
   return runApifyFallback(apifyToken, [
     {
       actorId: "apify/instagram-scraper",
       input: {
         directUrls: INSTAGRAM_HASHTAGS
-          .slice(0, 4)
+          .slice(0, 15)
           .map((tag) => `https://www.instagram.com/explore/tags/${encodeURIComponent(tag)}/`),
-        resultsLimit: 20,
-      },
-      timeoutSecs: 10,
-    },
-    {
-      actorId: "apify/instagram-scraper",
-      input: {
-        usernames: [
-          ...SEED_ACCOUNTS,
-        ],
-        resultsType: "posts",
-        resultsLimit: 18,
+        resultsLimit: 24,
       },
       timeoutSecs: 10,
     },
@@ -332,14 +177,6 @@ function pickNestedString(
   return pickString(asRecord(obj[outerKey]), innerKeys);
 }
 
-function pickNestedNumber(
-  obj: Record<string, unknown>,
-  outerKey: string,
-  innerKeys: string[]
-): number {
-  return pickNumber(asRecord(obj[outerKey]), innerKeys);
-}
-
 function safeSlice(text: string, max: number): string {
   return text ? text.slice(0, max) : "";
 }
@@ -357,19 +194,6 @@ function mergeUniqueTrends(lists: Trend[][]): Trend[] {
     }
   }
   return out;
-}
-
-function mapGoogleTrends(items: GoogleTrendItem[]): Trend[] {
-  return items.map((item) => ({
-    titulo: item.titulo,
-    plataforma: "Google Trends",
-    metricas: buildMetricas([
-      item.traffic ? `${item.traffic} buscas` : "",
-    ]),
-    fonte: item.newsTitle || "Google Trends Brasil",
-    url: item.newsUrl || item.url || "",
-    contexto: item.newsSnippet || "Tema em alta nas buscas do Google Brasil.",
-  }));
 }
 
 function mapInstagram(items: unknown[]): Trend[] {
@@ -412,115 +236,22 @@ function mapInstagram(items: unknown[]): Trend[] {
     .slice(0, 8);
 }
 
-function mapTikTok(items: unknown[]): Trend[] {
-  return (items as unknown[])
-    .map((raw) => {
-      const item = asRecord(raw);
-      const likes = pickNumber(item, ["diggCount", "likesCount", "likes"]);
-      const comments = pickNumber(item, ["commentCount", "commentsCount", "comments"]);
-      const views =
-        pickNumber(item, ["playCount", "videoViewCount", "views", "viewCount"]) ||
-        pickNestedNumber(item, "stats", ["playCount", "views"]);
-      const text = pickString(item, ["text", "desc", "description", "title"]);
-      const author =
-        pickString(item, ["author", "username"]) ||
-        pickNestedString(item, "authorMeta", ["name", "nickName", "userName"]);
-      const titulo = safeSlice(text, 90) || `Vídeo de @${author || "tiktok"}`;
-      const contexto = text || "Vídeo com alta tração no TikTok.";
-      const score = likes + comments * 5 + Math.round(views * 0.02);
-      const url =
-        pickString(item, ["webVideoUrl", "url", "videoUrl", "shareUrl"]) ||
-        pickNestedString(item, "webVideo", ["url"]);
-
-      return {
-        trend: {
-          titulo,
-          plataforma: "TikTok",
-          metricas: buildMetricas([
-            views > 0 ? `${views.toLocaleString("pt-BR")} views` : "",
-            likes > 0 ? `${likes.toLocaleString("pt-BR")} likes` : "",
-            comments > 0 ? `${comments.toLocaleString("pt-BR")} comentários` : "",
-          ]),
-          fonte: author ? `@${author}` : "TikTok",
-          url,
-          contexto,
-        } satisfies Trend,
-        score,
-      };
-    })
-    .sort((a, b) => b.score - a.score)
-    .map((entry) => entry.trend)
-    .filter((trend) => Boolean(trend.url || trend.titulo))
-    .slice(0, 8);
-}
-
-function mapYouTube(items: unknown[]): Trend[] {
-  return (items as unknown[])
-    .map((raw) => {
-      const item = asRecord(raw);
-      const views = pickNumber(item, ["viewCount", "views", "view_count"]);
-      const likes = pickNumber(item, ["likeCount", "likes", "likes_count"]);
-      const title = pickString(item, ["title", "name"]);
-      const channel = pickString(item, ["channelName", "channel", "author"]);
-      const description = pickString(item, ["description", "shortDescription"]);
-      const score = views + likes * 10;
-      const url = pickString(item, ["url", "videoUrl"]);
-
-      return {
-        trend: {
-          titulo: title || "Vídeo em alta no YouTube",
-          plataforma: "YouTube",
-          metricas: buildMetricas([
-            views > 0 ? `${views.toLocaleString("pt-BR")} views` : "",
-            likes > 0 ? `${likes.toLocaleString("pt-BR")} likes` : "",
-          ]),
-          fonte: channel || "YouTube",
-          url,
-          contexto: safeSlice(description, 280) || "Vídeo com alta atenção no YouTube.",
-        } satisfies Trend,
-        score,
-      };
-    })
-    .sort((a, b) => b.score - a.score)
-    .map((entry) => entry.trend)
-    .filter((trend) => Boolean(trend.url || trend.titulo))
-    .slice(0, 6);
-}
-
 export async function POST(req: NextRequest) {
   try {
     const debug = req.nextUrl.searchParams.get("debug") === "1";
     const apifyToken = process.env.APIFY_API_TOKEN;
     const socialSourceFailures: string[] = [];
+    if (!apifyToken) {
+      return NextResponse.json(
+        { error: "APIFY_API_TOKEN não configurado no servidor." },
+        { status: 500 }
+      );
+    }
 
-    // Run all sources in parallel with hard limits
-    const [trendsResult, youtubeResult, tiktokResult, instagramResult] = await Promise.allSettled([
-      fetchGoogleTrendsRSS(),
-      apifyToken
-        ? fetchYouTubeOptional(apifyToken, socialSourceFailures)
-        : Promise.resolve([]),
-      apifyToken
-        ? fetchTikTokOptional(apifyToken, socialSourceFailures)
-        : Promise.resolve([]),
-      apifyToken
-        ? fetchInstagramOptional(apifyToken, socialSourceFailures)
-        : Promise.resolve([]),
-    ]);
-
-    const googleTrends =
-      trendsResult.status === "fulfilled" ? trendsResult.value : [];
-    const youtube =
-      youtubeResult.status === "fulfilled"
-        ? truncate(youtubeResult.value as unknown[], 6)
-        : [];
-    const tiktok =
-      tiktokResult.status === "fulfilled"
-        ? truncate(tiktokResult.value as unknown[], 12)
-        : [];
-    const instagram =
-      instagramResult.status === "fulfilled"
-        ? truncate(instagramResult.value as unknown[], 12)
-        : [];
+    const instagram = truncate(
+      await fetchInstagramOptional(apifyToken, socialSourceFailures),
+      20
+    );
 
     if (debug) {
       const keySample = (value: unknown[]) =>
@@ -530,63 +261,21 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({
         build: BUILD_TAG,
-        monitoredHashtags: {
-          instagram: INSTAGRAM_HASHTAGS,
-          tiktok: TIKTOK_HASHTAGS,
-        },
-        monitoredSeeds: SEED_ACCOUNTS,
-        monitoredKeywords: KEYWORDS,
+        mode: "instagram_hashtags_only",
+        monitoredHashtags: INSTAGRAM_HASHTAGS,
+        disabledSources: ["tiktok", "youtube", "google_trends", "seed_accounts"],
         failures: socialSourceFailures,
         counts: {
           instagram: instagram.length,
-          tiktok: tiktok.length,
-          youtube: youtube.length,
-          google: googleTrends.length,
         },
         samples: {
           instagramKeys: keySample(instagram),
-          tiktokKeys: keySample(tiktok),
-          youtubeKeys: keySample(youtube),
           instagramFirst: (instagram as Record<string, unknown>[])[0] ?? null,
-          tiktokFirst: (tiktok as Record<string, unknown>[])[0] ?? null,
-          youtubeFirst: (youtube as Record<string, unknown>[])[0] ?? null,
         },
       });
     }
-
-    if (trendsResult.status === "rejected") {
-      console.warn("[/api/research/trends] Google source failed:", trendsResult.reason);
-    }
-    if (youtubeResult.status === "rejected") {
-      console.warn("[/api/research/trends] YouTube source failed:", youtubeResult.reason);
-    }
-    if (tiktokResult.status === "rejected") {
-      console.warn("[/api/research/trends] TikTok source failed:", tiktokResult.reason);
-    }
-    if (instagramResult.status === "rejected") {
-      console.warn("[/api/research/trends] Instagram source failed:", instagramResult.reason);
-    }
-
-    console.log(
-      `[/api/research/trends] Instagram: ${instagram.length}, TikTok: ${tiktok.length}, YouTube: ${youtube.length}, Google: ${googleTrends.length}`
-    );
-
     if (
-      googleTrends.length === 0 &&
-      youtube.length === 0 &&
-      tiktok.length === 0 &&
-      instagram.length === 0
-    ) {
-      return NextResponse.json(
-        { error: "Não foi possível buscar dados de tendências. Tente novamente." },
-        { status: 500 }
-      );
-    }
-
-    if (
-      apifyToken &&
       instagram.length === 0 &&
-      tiktok.length === 0 &&
       socialSourceFailures.some(
         (failure) =>
           failure.includes(": 402") ||
@@ -609,17 +298,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (instagram.length === 0) {
+      return NextResponse.json(
+        {
+          error:
+            "Não foi possível buscar trends do Instagram pelas hashtags selecionadas. Tente novamente.",
+        },
+        { status: 500 }
+      );
+    }
+
     const instagramTrends = mapInstagram(instagram);
-    const tiktokTrends = mapTikTok(tiktok);
-    const youtubeTrends = mapYouTube(youtube);
-    const googleTrendsMapped = mapGoogleTrends(truncate(googleTrends, 8));
-
-    const socialTrends = mergeUniqueTrends([instagramTrends, tiktokTrends]);
-    const nonSocialTrends = mergeUniqueTrends([youtubeTrends, googleTrendsMapped]);
-
-    const trends = socialTrends.length > 0
-      ? mergeUniqueTrends([truncate(socialTrends, 8), nonSocialTrends, socialTrends.slice(8)]).slice(0, 10)
-      : truncate(nonSocialTrends, 10);
+    const trends = truncate(mergeUniqueTrends([instagramTrends]), 10);
 
     return NextResponse.json(trends, {
       headers: {

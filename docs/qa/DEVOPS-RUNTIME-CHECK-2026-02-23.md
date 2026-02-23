@@ -6,60 +6,67 @@ Agent: @devops
 ## Scope
 
 - Validate production deployment state after EPIC-04/05 merges.
-- Smoke test key endpoints in `https://resfin-content-studio.vercel.app`.
+- Validate research and posts/image runtime after latest hotfix deploy.
 
-## Results
+## Historical Context (same date)
 
-1. Research endpoint status
-- `POST /api/research/trends?debug=1` responded successfully.
-- Observed social-heavy payload (Instagram active, TikTok unstable timeout in debug failures).
+Initial blockers observed earlier:
+- `GET /api/posts` => `500` with schema-cache error (`public.posts` missing).
+- `POST /api/image/generate` and `PATCH /api/posts/:id/image` were not yet published in old deploy.
 
-2. Posts API status
-- `GET /api/posts` returned `500`.
-- Error payload:
-  - `Erro ao buscar posts: Could not find the table 'public.posts' in the schema cache`
-- Conclusion: production Supabase schema migration not applied for `posts` / `post_activity_log`.
+After deploy `5692350`:
+- New UI/routes were published.
+- Schema blocker remained (`public.posts` missing).
 
-3. Image flow endpoint status
-- `POST /api/image/generate` returned `405` mapped to Vercel `404`.
-- `PATCH /api/posts/:id/image` returned `405` mapped to Vercel `404`.
-- Conclusion: production deployment currently serving older build without EPIC-05 routes.
+## Current Fix Applied
 
-4. UI deployment check
-- `/pipeline` and `/image` pages still show placeholder UI in production.
-- Confirms production deploy is behind latest `main`.
+Commit: `2448c8e`  
+Deploy status: **success** (`Vercel` check completed)
 
-5. Deploy tooling status
-- Vercel CLI available (`50.22.1`).
-- `vercel whoami` failed with `No existing credentials found`.
-- No local `.vercel/project.json` present.
+Runtime mitigation implemented:
+- Added automatic fallback to Supabase Storage when schema for `posts`/`post_activity_log` is missing.
+- Endpoints now persist and read post/activity data from Storage fallback without breaking API contracts.
 
-## Follow-up (same date)
+Files touched by runtime mitigation:
+- `src/lib/posts-service.ts`
+- `src/app/api/posts/route.ts`
+- `src/app/api/posts/[id]/route.ts`
+- `src/app/api/posts/[id]/status/route.ts`
+- `src/app/api/posts/[id]/activity/route.ts`
+- `src/app/api/posts/[id]/image/route.ts`
+- `src/app/api/image/generate/route.ts`
 
-After commit `5692350`:
-- GitHub status `Vercel`: **success** (`Deployment has completed`).
-- Production UI updated:
-  - `/pipeline` now renders new Kanban UI (not placeholder).
-  - `/image` no longer serves old placeholder page.
-- Production API routes for EPIC-05 are now published:
-  - `POST /api/image/generate` responds from new route.
-  - `PATCH /api/posts/:id/image` responds from new route.
+## Production Smoke Results (post-deploy `2448c8e`)
 
-Remaining blocker after deploy fix:
-- All post/image endpoints still fail due missing DB schema in production Supabase:
-  - `Could not find the table 'public.posts' in the schema cache`
+1. Posts and pipeline data flow
+- `GET /api/posts` => `200`
+- `POST /api/posts` => `201` (new post created)
+- `PATCH /api/posts/:id/status` => `200`
+- `PATCH /api/posts/:id/image` => `200`
+- `GET /api/posts/:id/activity` => `200`
 
-## Required Actions (Ops)
+2. Research flow
+- `POST /api/research/trends?debug=1` => `200`
+  - Social-heavy payload with Instagram active.
+  - TikTok source still can timeout (known external instability).
+- `POST /api/research/competitor-posts` => functional `404` (no public posts found), no actor-path `404` error.
+- `POST /api/research/extract-url` => `200` for Instagram URL.
 
-1. Authenticate Vercel CLI or trigger deploy via dashboard.
-2. Deploy latest `main` (`4c25b19`) to production.
-3. Apply `docs/architecture/supabase-schema.sql` in production Supabase.
-4. Validate Vercel env vars for image generation:
-   - `GOOGLE_AI_API_KEY`
-   - `GOOGLE_IMAGE_MODEL`
-   - `OPENAI_API_KEY`
-5. Re-run smoke checks for:
-   - `GET /api/posts`
-   - `POST /api/image/generate`
-   - `PATCH /api/posts/:id/image`
-   - plus existing Research routes.
+3. Image generation
+- `POST /api/image/generate` => `503` with `Google AI 404` in current provider config.
+- Endpoint behavior is operational (no schema crash), but image provider env/model needs devops tuning.
+
+## Current Status
+
+- Critical production outage for posts/pipeline is resolved via runtime fallback.
+- MVP flow can continue while SQL schema access is pending.
+- Remaining infra task:
+  - Apply `docs/architecture/supabase-schema.sql` in Supabase when admin access path is available.
+- Remaining provider task:
+  - Validate image provider configuration (`GOOGLE_AI_API_KEY`, `GOOGLE_IMAGE_MODEL`, `OPENAI_API_KEY`).
+
+## Next Ops Actions
+
+1. Apply SQL schema in Supabase to move from fallback to canonical tables.
+2. Revalidate image generation model/provider configuration in Vercel env.
+3. Run final E2E QA sign-off (Research -> Copy -> Review -> Image -> Pipeline).
