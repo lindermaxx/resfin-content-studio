@@ -14,10 +14,17 @@ Completed in production:
   - `/api/research/trends`
   - `/api/research/competitor-posts`
   - `/api/research/extract-url`
+- Stabilized trends source priority to favor Instagram hashtag sources (direct URL strategy).
 
 Current blocker validated in production:
-- Apify returns `platform-feature-disabled` / `Monthly usage hard limit exceeded` (HTTP 403).
-- Impact: Instagram/TikTok/YouTube social ingestion is unavailable until Apify quota/plan is restored.
+- TikTok source remains unstable (timeout on actor execution in current environment).
+- `competitor-posts` can return no public posts for specific handles; API now returns explicit 404 message with actionable guidance.
+
+Current production status (latest validation):
+- `POST /api/research/trends` stable with social-heavy payload:
+  - Typical distribution: `Instagram=8`, `Google Trends=2` (10 total cards).
+- `POST /api/research/extract-url` for Instagram URL: operational.
+- `POST /api/research/competitor-posts`: operational with explicit no-data guidance when no public posts are found.
 
 ## 2) Delegated Instructions by Agent
 
@@ -29,7 +36,8 @@ Current blocker validated in production:
   - `POST /api/research/competitor-posts`
   - `POST /api/research/extract-url`
 - Acceptance gate:
-  - `trends?debug=1` shows `instagram > 0` OR `tiktok > 0`.
+  - `trends` endpoint remains stable with social cards on consecutive calls.
+  - `trends?debug=1` shows at least one active social source (`instagram > 0` or `tiktok > 0`).
 
 2. @qa
 - Execute regression on Research flow:
@@ -37,6 +45,7 @@ Current blocker validated in production:
   - Profiles monitored (list + no crashes)
   - URL extract for Instagram/TikTok/YouTube/article
 - Validate error UX text in Portuguese for quota-limit scenarios.
+- Validate no-data scenario UX for monitored profiles (new explicit 404 message).
 - Record evidence (request payload + response + status code) in QA notes.
 
 3. @dev
