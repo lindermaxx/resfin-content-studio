@@ -5,6 +5,9 @@ export const maxDuration = 60;
 
 export type { CompetitorPost };
 
+const RECENT_DAYS_WINDOW = 10;
+const FALLBACK_DAYS_WINDOW = 30;
+
 async function runActor(
   actorId: string,
   input: Record<string, unknown>,
@@ -85,14 +88,7 @@ export async function POST(req: NextRequest) {
       50
     );
 
-    const tenDaysAgo = Date.now() - 10 * 24 * 60 * 60 * 1000;
-
-    const posts: CompetitorPost[] = (items as Record<string, unknown>[])
-      .filter((item) => {
-        const ts = new Date((item.timestamp as string) || 0).getTime();
-        return ts >= tenDaysAgo;
-      })
-      .map((item) => {
+    const mapPost = (item: Record<string, unknown>): CompetitorPost => {
         const likes = (item.likesCount as number) || 0;
         const comments = (item.commentsCount as number) || 0;
         const views = (item.videoViewCount as number) || 0;
@@ -111,7 +107,28 @@ export async function POST(req: NextRequest) {
             "",
           engagementScore: computeEngagement(likes, comments, views),
         };
-      })
+      };
+
+    const allPosts = (items as Record<string, unknown>[])
+      .map(mapPost)
+      .filter((post) => Boolean(post.url && post.username));
+
+    const tenDaysAgo = Date.now() - RECENT_DAYS_WINDOW * 24 * 60 * 60 * 1000;
+    const thirtyDaysAgo = Date.now() - FALLBACK_DAYS_WINDOW * 24 * 60 * 60 * 1000;
+
+    const recentPosts = allPosts.filter((post) => {
+      const ts = new Date(post.timestamp || 0).getTime();
+      return Number.isFinite(ts) && ts >= tenDaysAgo;
+    });
+
+    const fallbackPosts = allPosts.filter((post) => {
+      const ts = new Date(post.timestamp || 0).getTime();
+      return Number.isFinite(ts) && ts >= thirtyDaysAgo;
+    });
+
+    const source = recentPosts.length > 0 ? recentPosts : fallbackPosts;
+
+    const posts: CompetitorPost[] = source
       .sort((a, b) => b.engagementScore - a.engagementScore)
       .slice(0, 20); // top 20 posts
 
