@@ -83,6 +83,41 @@ async function runApifyActor(
   return res.json();
 }
 
+function stripErrorItems(items: unknown[]): unknown[] {
+  return (items as Record<string, unknown>[])
+    .filter((item) => typeof item === "object" && item !== null)
+    .filter((item) => typeof item.error !== "string");
+}
+
+async function runApifyFallback(
+  token: string,
+  candidates: Array<{
+    actorId: string;
+    input: Record<string, unknown>;
+    timeoutSecs?: number;
+  }>
+): Promise<unknown[]> {
+  for (const candidate of candidates) {
+    try {
+      const rows = await runApifyActor(
+        candidate.actorId,
+        candidate.input,
+        token,
+        candidate.timeoutSecs ?? 8
+      );
+      const cleaned = stripErrorItems(rows);
+      if (cleaned.length > 0) return cleaned;
+    } catch (err) {
+      console.warn(
+        "[/api/research/trends] candidate source failed:",
+        candidate.actorId,
+        err
+      );
+    }
+  }
+  return [];
+}
+
 // ── Optional social trends via Apify (best-effort) ─────────────────────────
 async function fetchYouTubeOptional(
   apifyToken: string
@@ -104,46 +139,78 @@ async function fetchYouTubeOptional(
 }
 
 async function fetchTikTokOptional(apifyToken: string): Promise<unknown[]> {
-  return runApifyActor(
-    "clockworks/free-tiktok-scraper",
+  return runApifyFallback(apifyToken, [
     {
-      hashtags: [
-        "financas",
-        "investimentos",
-        "medicina",
-        "economia",
-        "dinheiro",
-      ],
-      resultsPerPage: 12,
-      shouldDownloadCovers: false,
-      shouldDownloadSlideshowImages: false,
-      shouldDownloadSubtitles: false,
-      shouldDownloadVideos: false,
+      actorId: "clockworks/tiktok-trends-scraper",
+      input: { countryCode: "BR", maxItems: 20 },
+      timeoutSecs: 8,
     },
-    apifyToken,
-    8
-  );
+    {
+      actorId: "clockworks/free-tiktok-scraper",
+      input: {
+        hashtags: [
+          "financas",
+          "investimentos",
+          "medicina",
+          "economia",
+          "dinheiro",
+          "fypbrasil",
+        ],
+        resultsPerPage: 18,
+        shouldDownloadCovers: false,
+        shouldDownloadSlideshowImages: false,
+        shouldDownloadSubtitles: false,
+        shouldDownloadVideos: false,
+      },
+      timeoutSecs: 8,
+    },
+  ]);
 }
 
 async function fetchInstagramOptional(apifyToken: string): Promise<unknown[]> {
-  return runApifyActor(
-    "apify/instagram-scraper",
+  return runApifyFallback(apifyToken, [
     {
-      usernames: [
-        "nataliaribeiro",
-        "mepoupena",
-        "primonico",
-        "g4_educacao",
-        "residenciaemfinancas",
-        "medwayresidencia",
-        "medcof",
-      ],
-      resultsType: "posts",
-      resultsLimit: 18,
+      actorId: "apify/instagram-hashtag-scraper",
+      input: {
+        hashtags: [
+          "investimentos",
+          "financas",
+          "economia",
+          "medicina",
+          "medico",
+          "dinheiro",
+        ],
+        resultsPerPage: 20,
+      },
+      timeoutSecs: 8,
     },
-    apifyToken,
-    8
-  );
+    {
+      actorId: "apify/instagram-scraper",
+      input: {
+        directUrls: [
+          "https://www.instagram.com/explore/tags/investimentos/",
+          "https://www.instagram.com/explore/tags/financas/",
+          "https://www.instagram.com/explore/tags/economia/",
+        ],
+        resultsLimit: 20,
+      },
+      timeoutSecs: 8,
+    },
+    {
+      actorId: "apify/instagram-scraper",
+      input: {
+        usernames: [
+          "nataliaribeiro",
+          "mepoupena",
+          "primonico",
+          "residenciaemfinancas",
+        ],
+        resultsType: "posts",
+        resultsLimit: 18,
+      },
+      timeoutSecs: 8,
+    },
+  ]);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -160,6 +227,46 @@ function toNumber(value: unknown): number {
 
 function buildMetricas(values: string[]): string[] {
   return values.map((v) => v.trim()).filter(Boolean).slice(0, 3);
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return (value && typeof value === "object") ? (value as Record<string, unknown>) : {};
+}
+
+function pickString(obj: Record<string, unknown>, keys: string[]): string {
+  for (const key of keys) {
+    const value = obj[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "";
+}
+
+function pickNumber(obj: Record<string, unknown>, keys: string[]): number {
+  for (const key of keys) {
+    const n = toNumber(obj[key]);
+    if (n > 0) return n;
+  }
+  return 0;
+}
+
+function pickNestedString(
+  obj: Record<string, unknown>,
+  outerKey: string,
+  innerKeys: string[]
+): string {
+  return pickString(asRecord(obj[outerKey]), innerKeys);
+}
+
+function pickNestedNumber(
+  obj: Record<string, unknown>,
+  outerKey: string,
+  innerKeys: string[]
+): number {
+  return pickNumber(asRecord(obj[outerKey]), innerKeys);
+}
+
+function safeSlice(text: string, max: number): string {
+  return text ? text.slice(0, max) : "";
 }
 
 function mergeUniqueTrends(lists: Trend[][]): Trend[] {
@@ -191,16 +298,22 @@ function mapGoogleTrends(items: GoogleTrendItem[]): Trend[] {
 }
 
 function mapInstagram(items: unknown[]): Trend[] {
-  return (items as Record<string, unknown>[])
-    .map((item) => {
-      const likes = toNumber(item.likesCount);
-      const comments = toNumber(item.commentsCount);
-      const views = toNumber(item.videoViewCount);
-      const caption = ((item.caption as string) || "").trim();
-      const owner = ((item.ownerUsername as string) || "").trim();
-      const titulo = caption.slice(0, 90) || `Post de @${owner || "instagram"}`;
+  return (items as unknown[])
+    .map((raw) => {
+      const item = asRecord(raw);
+      const likes = pickNumber(item, ["likesCount", "likes", "likes_count"]);
+      const comments = pickNumber(item, ["commentsCount", "comments", "comments_count"]);
+      const views = pickNumber(item, ["videoViewCount", "viewCount", "views", "playCount"]);
+      const caption = pickString(item, ["caption", "text", "title", "description"]);
+      const owner =
+        pickString(item, ["ownerUsername", "username", "owner", "author"]) ||
+        pickNestedString(item, "owner", ["username", "name"]) ||
+        pickNestedString(item, "authorMeta", ["name", "nickName"]);
+      const hashtag = pickString(item, ["hashtag", "tag"]);
+      const titulo = safeSlice(caption, 90) || (hashtag ? `#${hashtag}` : `Post de @${owner || "instagram"}`);
       const contexto = caption || "Post com alta interação no Instagram.";
       const score = likes + comments * 5 + Math.round(views * 0.05);
+      const url = pickString(item, ["url", "postUrl", "shortCodeUrl", "inputUrl"]);
 
       return {
         trend: {
@@ -212,7 +325,7 @@ function mapInstagram(items: unknown[]): Trend[] {
             views > 0 ? `${views.toLocaleString("pt-BR")} views` : "",
           ]),
           fonte: owner ? `@${owner}` : "Instagram",
-          url: (item.url as string) || "",
+          url,
           contexto,
         } satisfies Trend,
         score,
@@ -220,22 +333,29 @@ function mapInstagram(items: unknown[]): Trend[] {
     })
     .sort((a, b) => b.score - a.score)
     .map((entry) => entry.trend)
+    .filter((trend) => Boolean(trend.url || trend.titulo))
     .slice(0, 8);
 }
 
 function mapTikTok(items: unknown[]): Trend[] {
-  return (items as Record<string, unknown>[])
-    .map((item) => {
-      const likes = toNumber(item.diggCount);
-      const comments = toNumber(item.commentCount);
-      const views = toNumber(item.playCount);
-      const text = ((item.text as string) || "").trim();
-      const authorMeta = item.authorMeta as Record<string, unknown> | undefined;
+  return (items as unknown[])
+    .map((raw) => {
+      const item = asRecord(raw);
+      const likes = pickNumber(item, ["diggCount", "likesCount", "likes"]);
+      const comments = pickNumber(item, ["commentCount", "commentsCount", "comments"]);
+      const views =
+        pickNumber(item, ["playCount", "videoViewCount", "views", "viewCount"]) ||
+        pickNestedNumber(item, "stats", ["playCount", "views"]);
+      const text = pickString(item, ["text", "desc", "description", "title"]);
       const author =
-        ((authorMeta?.name as string) || (authorMeta?.nickName as string) || "").trim();
-      const titulo = text.slice(0, 90) || `Vídeo de @${author || "tiktok"}`;
+        pickString(item, ["author", "username"]) ||
+        pickNestedString(item, "authorMeta", ["name", "nickName", "userName"]);
+      const titulo = safeSlice(text, 90) || `Vídeo de @${author || "tiktok"}`;
       const contexto = text || "Vídeo com alta tração no TikTok.";
       const score = likes + comments * 5 + Math.round(views * 0.02);
+      const url =
+        pickString(item, ["webVideoUrl", "url", "videoUrl", "shareUrl"]) ||
+        pickNestedString(item, "webVideo", ["url"]);
 
       return {
         trend: {
@@ -247,7 +367,7 @@ function mapTikTok(items: unknown[]): Trend[] {
             comments > 0 ? `${comments.toLocaleString("pt-BR")} comentários` : "",
           ]),
           fonte: author ? `@${author}` : "TikTok",
-          url: ((item.webVideoUrl as string) || (item.videoUrl as string) || "").trim(),
+          url,
           contexto,
         } satisfies Trend,
         score,
@@ -255,18 +375,21 @@ function mapTikTok(items: unknown[]): Trend[] {
     })
     .sort((a, b) => b.score - a.score)
     .map((entry) => entry.trend)
+    .filter((trend) => Boolean(trend.url || trend.titulo))
     .slice(0, 8);
 }
 
 function mapYouTube(items: unknown[]): Trend[] {
-  return (items as Record<string, unknown>[])
-    .map((item) => {
-      const views = toNumber(item.viewCount);
-      const likes = toNumber(item.likeCount);
-      const title = ((item.title as string) || "").trim();
-      const channel = ((item.channelName as string) || "").trim();
-      const description = ((item.description as string) || "").trim();
+  return (items as unknown[])
+    .map((raw) => {
+      const item = asRecord(raw);
+      const views = pickNumber(item, ["viewCount", "views", "view_count"]);
+      const likes = pickNumber(item, ["likeCount", "likes", "likes_count"]);
+      const title = pickString(item, ["title", "name"]);
+      const channel = pickString(item, ["channelName", "channel", "author"]);
+      const description = pickString(item, ["description", "shortDescription"]);
       const score = views + likes * 10;
+      const url = pickString(item, ["url", "videoUrl"]);
 
       return {
         trend: {
@@ -277,14 +400,15 @@ function mapYouTube(items: unknown[]): Trend[] {
             likes > 0 ? `${likes.toLocaleString("pt-BR")} likes` : "",
           ]),
           fonte: channel || "YouTube",
-          url: ((item.url as string) || "").trim(),
-          contexto: description.slice(0, 280) || "Vídeo com alta atenção no YouTube.",
+          url,
+          contexto: safeSlice(description, 280) || "Vídeo com alta atenção no YouTube.",
         } satisfies Trend,
         score,
       };
     })
     .sort((a, b) => b.score - a.score)
     .map((entry) => entry.trend)
+    .filter((trend) => Boolean(trend.url || trend.titulo))
     .slice(0, 6);
 }
 
