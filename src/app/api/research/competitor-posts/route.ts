@@ -174,6 +174,16 @@ export async function POST(req: NextRequest) {
       .sort((a, b) => b.engagementScore - a.engagementScore)
       .slice(0, 20); // top 20 posts
 
+    if (posts.length === 0) {
+      return NextResponse.json(
+        {
+          error:
+            "Nenhum post público encontrado para os perfis informados (últimos 30 dias). Verifique se os handles estão corretos, públicos e ativos.",
+        },
+        { status: 404 }
+      );
+    }
+
     return NextResponse.json(posts);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
