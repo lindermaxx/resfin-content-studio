@@ -17,6 +17,25 @@ import type { Trend, ExtractedContent, CompetitorPost } from "@/lib/research-typ
 
 const TRENDS_CACHE_KEY = "resfin_trends_v2";
 const PROFILES_KEY = "resfin_profiles_v1";
+const HASHTAGS_KEY = "resfin_hashtags_v1";
+const MAX_SELECTED_HASHTAGS = 12;
+const DEFAULT_HASHTAG_OPTIONS = [
+  "financaspessoais",
+  "investimentos",
+  "educacaofinanceira",
+  "planejamentofinanceiro",
+  "independenciafinanceira",
+  "reservadeemergencia",
+  "tesouredireto",
+  "fundosimobiliarios",
+  "acoes",
+  "rendavariavel",
+  "rendafixa",
+  "dividendos",
+  "financas",
+  "dinheiro",
+  "liberdadefinanceira",
+];
 
 const tipoLabel: Record<ExtractedContent["tipo"], string> = {
   reels: "Reels", carrossel: "Carrossel", video: "Vídeo", artigo: "Artigo", post: "Post",
@@ -43,6 +62,10 @@ function normalizeMetricas(value: unknown): string[] {
   }
   if (typeof value === "string" && value.trim()) return [value.trim()];
   return [];
+}
+
+function normalizeHashtag(value: string): string {
+  return value.trim().replace(/^#/, "").replace(/\s+/g, "").toLowerCase();
 }
 
 function normalizeTrend(value: unknown): Trend | null {
@@ -76,6 +99,13 @@ export default function ResearchPage() {
   const [loadingTrends, setLoadingTrends] = useState(false);
   const [trendsError, setTrendsError] = useState<string | null>(null);
   const [selectedTrend, setSelectedTrend] = useState<Trend | null>(null);
+  const [availableHashtags, setAvailableHashtags] = useState<string[]>(
+    DEFAULT_HASHTAG_OPTIONS
+  );
+  const [selectedHashtags, setSelectedHashtags] = useState<string[]>(
+    DEFAULT_HASHTAG_OPTIONS.slice(0, 4)
+  );
+  const [newHashtag, setNewHashtag] = useState("");
 
   // Topic / draft
   const [manualTema, setManualTema] = useState("");
@@ -109,17 +139,117 @@ export default function ResearchPage() {
     }
     const stored = localStorage.getItem(PROFILES_KEY);
     if (stored) { try { setProfiles(JSON.parse(stored)); } catch { /* */ } }
+
+    const storedHashtags = localStorage.getItem(HASHTAGS_KEY);
+    if (storedHashtags) {
+      try {
+        const parsed = JSON.parse(storedHashtags) as {
+          available?: string[];
+          selected?: string[];
+        };
+
+        const availableParsed = Array.isArray(parsed.available)
+          ? parsed.available
+              .filter((item): item is string => typeof item === "string")
+              .map((item) => normalizeHashtag(item))
+              .filter(Boolean)
+          : [];
+
+        const available =
+          availableParsed.length > 0
+            ? Array.from(new Set(availableParsed))
+            : DEFAULT_HASHTAG_OPTIONS;
+
+        const selectedParsed = Array.isArray(parsed.selected)
+          ? parsed.selected
+              .filter((item): item is string => typeof item === "string")
+              .map((item) => normalizeHashtag(item))
+              .filter(Boolean)
+          : [];
+
+        const selected = selectedParsed
+          .filter((item) => available.includes(item))
+          .slice(0, MAX_SELECTED_HASHTAGS);
+
+        setAvailableHashtags(available);
+        setSelectedHashtags(
+          selected.length > 0 ? selected : available.slice(0, 4)
+        );
+      } catch {
+        // ignore invalid saved hashtag state
+      }
+    }
   }, []);
 
   const temaSelecionado = selectedTrend !== null || manualTema.trim().length > 0;
 
+  function saveHashtagSelection(nextAvailable: string[], nextSelected: string[]) {
+    setAvailableHashtags(nextAvailable);
+    setSelectedHashtags(nextSelected);
+    localStorage.setItem(
+      HASHTAGS_KEY,
+      JSON.stringify({ available: nextAvailable, selected: nextSelected })
+    );
+  }
+
+  function toggleHashtag(tag: string) {
+    if (selectedHashtags.includes(tag)) {
+      const updated = selectedHashtags.filter((item) => item !== tag);
+      setTrendsError(null);
+      saveHashtagSelection(availableHashtags, updated);
+      return;
+    }
+
+    if (selectedHashtags.length >= MAX_SELECTED_HASHTAGS) {
+      setTrendsError(
+        `Selecione no máximo ${MAX_SELECTED_HASHTAGS} hashtags por execução.`
+      );
+      return;
+    }
+
+    setTrendsError(null);
+    saveHashtagSelection(availableHashtags, [...selectedHashtags, tag]);
+  }
+
+  function adicionarHashtagCustomizada() {
+    const normalized = normalizeHashtag(newHashtag);
+    if (!normalized) return;
+
+    if (selectedHashtags.length >= MAX_SELECTED_HASHTAGS) {
+      setTrendsError(
+        `Selecione no máximo ${MAX_SELECTED_HASHTAGS} hashtags por execução.`
+      );
+      return;
+    }
+
+    const nextAvailable = availableHashtags.includes(normalized)
+      ? availableHashtags
+      : [...availableHashtags, normalized];
+    const nextSelected = selectedHashtags.includes(normalized)
+      ? selectedHashtags
+      : [...selectedHashtags, normalized];
+
+    setTrendsError(null);
+    saveHashtagSelection(nextAvailable, nextSelected);
+    setNewHashtag("");
+  }
+
   // ── Trends ───────────────────────────────────────────────────────────────
   async function buscarTrends(forcar = false) {
+    if (selectedHashtags.length === 0) {
+      setTrendsError("Selecione ao menos 1 hashtag antes de buscar trends.");
+      return;
+    }
+
     setLoadingTrends(true);
     setTrendsError(null);
     if (forcar) setSelectedTrend(null);
     try {
-      const res = await fetch("/api/research/trends", { method: "POST" });
+      const res = await fetch("/api/research/trends", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hashtags: selectedHashtags }),
+      });
       let data: unknown;
       try { data = await res.json(); } catch {
         throw new Error("Tempo limite excedido ao buscar trends — tente novamente.");
@@ -241,16 +371,79 @@ export default function ResearchPage() {
           <h2 className="text-sm font-medium text-zinc-700">Trending topics da semana</h2>
           <div className="flex gap-2">
             {trends.length > 0 && (
-              <Button variant="outline" size="sm" onClick={() => buscarTrends(true)} disabled={loadingTrends}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => buscarTrends(true)}
+                disabled={loadingTrends || selectedHashtags.length === 0}
+              >
                 <RefreshCw className="mr-2 h-3.5 w-3.5" />Atualizar
               </Button>
             )}
-            <Button onClick={() => buscarTrends(false)} disabled={loadingTrends} size="sm">
+            <Button
+              onClick={() => buscarTrends(false)}
+              disabled={loadingTrends || selectedHashtags.length === 0}
+              size="sm"
+            >
               {loadingTrends ? (
                 <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Buscando...</>
               ) : (
                 <><Search className="mr-2 h-4 w-4" />Buscar Trends da Semana</>
               )}
+            </Button>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-zinc-200 bg-white p-4 flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs text-zinc-500">
+              Hashtags para esta execução manual do Instagram
+            </p>
+            <span className="text-xs text-zinc-400">
+              {selectedHashtags.length}/{MAX_SELECTED_HASHTAGS} selecionadas
+            </span>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {availableHashtags.map((tag) => {
+              const selected = selectedHashtags.includes(tag);
+              return (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => toggleHashtag(tag)}
+                  className={cn(
+                    "rounded-full border px-3 py-1 text-xs transition-colors",
+                    selected
+                      ? "border-zinc-900 bg-zinc-900 text-white"
+                      : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-400 hover:text-zinc-900"
+                  )}
+                >
+                  #{tag}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="#bancomaster"
+              value={newHashtag}
+              onChange={(e) => setNewHashtag(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") adicionarHashtagCustomizada();
+              }}
+              className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-400 focus:outline-none"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={adicionarHashtagCustomizada}
+              disabled={!newHashtag.trim()}
+            >
+              <Plus className="mr-1.5 h-3.5 w-3.5" />
+              Adicionar #
             </Button>
           </div>
         </div>

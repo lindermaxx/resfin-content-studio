@@ -44,6 +44,9 @@ const INSTAGRAM_HASHTAGS = parseHashtags(
   process.env.RESEARCH_INSTAGRAM_HASHTAGS,
   DEFAULT_INSTAGRAM_HASHTAGS
 );
+const MAX_HASHTAGS_PER_EXECUTION = 12;
+const INSTAGRAM_BATCH_SIZE = 4;
+const MAX_BATCHES_PER_EXECUTION = 3;
 
 function truncate<T>(arr: T[], max: number): T[] {
   return arr.slice(0, max);
@@ -117,27 +120,86 @@ async function runApifyFallback(
   return [];
 }
 
-// ── Instagram-only trends via Apify (manual trigger mode) ──────────────────
-function pickSelectedHashtagBatch(hashtags: string[], size = 4): string[] {
-  return hashtags.slice(0, size);
+function uniqueStrings(values: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+
+  for (const value of values) {
+    if (!seen.has(value)) {
+      seen.add(value);
+      out.push(value);
+    }
+  }
+
+  return out;
 }
 
-async function fetchInstagramOptional(apifyToken: string, failures?: string[]): Promise<unknown[]> {
-  const selectedBatch = pickSelectedHashtagBatch(INSTAGRAM_HASHTAGS, 4);
+function resolveRequestedHashtags(payload: unknown): string[] {
+  const raw = payload as { hashtags?: unknown };
+  const requested = Array.isArray(raw?.hashtags)
+    ? raw.hashtags.filter((item): item is string => typeof item === "string")
+    : [];
 
-  return runApifyFallback(apifyToken, [
-    {
-      actorId: "apify/instagram-scraper",
-      input: {
-        directUrls: selectedBatch.map(
-          (tag) =>
-            `https://www.instagram.com/explore/tags/${encodeURIComponent(tag)}/`
-        ),
-        resultsLimit: 16,
-      },
-      timeoutSecs: 20,
-    },
-  ], failures);
+  const normalizedRequested = uniqueStrings(
+    requested
+      .map((tag) => tag.trim().replace(/^#/, "").replace(/\s+/g, "").toLowerCase())
+      .filter(Boolean)
+  );
+
+  if (normalizedRequested.length === 0) return INSTAGRAM_HASHTAGS;
+  return normalizedRequested.slice(0, MAX_HASHTAGS_PER_EXECUTION);
+}
+
+function splitIntoBatches(values: string[], batchSize: number): string[][] {
+  const batches: string[][] = [];
+
+  for (let index = 0; index < values.length; index += batchSize) {
+    batches.push(values.slice(index, index + batchSize));
+  }
+
+  return batches;
+}
+
+async function fetchInstagramOptional(
+  apifyToken: string,
+  hashtags: string[],
+  failures?: string[]
+): Promise<{ rows: unknown[]; usedHashtagBatches: string[][] }> {
+  const batches = splitIntoBatches(hashtags, INSTAGRAM_BATCH_SIZE).slice(
+    0,
+    MAX_BATCHES_PER_EXECUTION
+  );
+  const aggregateRows: unknown[] = [];
+  const usedHashtagBatches: string[][] = [];
+
+  for (const batch of batches) {
+    const rows = await runApifyFallback(
+      apifyToken,
+      [
+        {
+          actorId: "apify/instagram-scraper",
+          input: {
+            directUrls: batch.map(
+              (tag) =>
+                `https://www.instagram.com/explore/tags/${encodeURIComponent(tag)}/`
+            ),
+            resultsLimit: 16,
+          },
+          timeoutSecs: 20,
+        },
+      ],
+      failures
+    );
+
+    if (rows.length > 0) {
+      aggregateRows.push(...rows);
+      usedHashtagBatches.push(batch);
+    }
+
+    if (aggregateRows.length >= 20) break;
+  }
+
+  return { rows: aggregateRows, usedHashtagBatches };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -248,7 +310,8 @@ export async function POST(req: NextRequest) {
     const debug = req.nextUrl.searchParams.get("debug") === "1";
     const apifyToken = process.env.APIFY_API_TOKEN;
     const socialSourceFailures: string[] = [];
-    const selectedHashtagBatch = pickSelectedHashtagBatch(INSTAGRAM_HASHTAGS, 4);
+    const requestBody = await req.json().catch(() => ({}));
+    const selectedHashtags = resolveRequestedHashtags(requestBody);
     if (!apifyToken) {
       return NextResponse.json(
         { error: "APIFY_API_TOKEN não configurado no servidor." },
@@ -256,10 +319,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const instagram = truncate(
-      await fetchInstagramOptional(apifyToken, socialSourceFailures),
-      20
+    const instagramResult = await fetchInstagramOptional(
+      apifyToken,
+      selectedHashtags,
+      socialSourceFailures
     );
+    const instagram = truncate(instagramResult.rows, 20);
 
     if (debug) {
       const keySample = (value: unknown[]) =>
@@ -271,7 +336,8 @@ export async function POST(req: NextRequest) {
         build: BUILD_TAG,
         mode: "instagram_hashtags_only",
         monitoredHashtags: INSTAGRAM_HASHTAGS,
-        activeHashtagBatch: selectedHashtagBatch,
+        selectedHashtags,
+        usedHashtagBatches: instagramResult.usedHashtagBatches,
         disabledSources: ["tiktok", "youtube", "google_trends", "seed_accounts"],
         failures: socialSourceFailures,
         counts: {
