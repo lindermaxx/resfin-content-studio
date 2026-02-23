@@ -2,8 +2,46 @@ import { NextRequest, NextResponse } from "next/server";
 import type { Trend } from "@/lib/research-types";
 
 export const maxDuration = 60;
+export const dynamic = "force-dynamic";
+const BUILD_TAG = "trends-social-v6";
 
 export type { Trend };
+
+const DEFAULT_INSTAGRAM_HASHTAGS = [
+  "investimentos",
+  "financas",
+  "economia",
+  "medicina",
+  "medico",
+  "dinheiro",
+];
+
+const DEFAULT_TIKTOK_HASHTAGS = [
+  "financas",
+  "investimentos",
+  "medicina",
+  "economia",
+  "dinheiro",
+  "fypbrasil",
+];
+
+function parseHashtags(value: string | undefined, fallback: string[]): string[] {
+  if (!value?.trim()) return fallback;
+  const tags = value
+    .split(",")
+    .map((tag) => tag.trim().replace(/^#/, ""))
+    .filter(Boolean);
+  return tags.length > 0 ? tags : fallback;
+}
+
+const INSTAGRAM_HASHTAGS = parseHashtags(
+  process.env.RESEARCH_INSTAGRAM_HASHTAGS,
+  DEFAULT_INSTAGRAM_HASHTAGS
+);
+const TIKTOK_HASHTAGS = parseHashtags(
+  process.env.RESEARCH_TIKTOK_HASHTAGS,
+  DEFAULT_TIKTOK_HASHTAGS
+);
 
 // ── Google Trends RSS (Brasil) — instant, no Apify ─────────────────────────
 interface GoogleTrendItem {
@@ -148,14 +186,7 @@ async function fetchTikTokOptional(apifyToken: string): Promise<unknown[]> {
     {
       actorId: "clockworks/free-tiktok-scraper",
       input: {
-        hashtags: [
-          "financas",
-          "investimentos",
-          "medicina",
-          "economia",
-          "dinheiro",
-          "fypbrasil",
-        ],
+        hashtags: TIKTOK_HASHTAGS,
         resultsPerPage: 18,
         shouldDownloadCovers: false,
         shouldDownloadSlideshowImages: false,
@@ -172,14 +203,7 @@ async function fetchInstagramOptional(apifyToken: string): Promise<unknown[]> {
     {
       actorId: "apify/instagram-hashtag-scraper",
       input: {
-        hashtags: [
-          "investimentos",
-          "financas",
-          "economia",
-          "medicina",
-          "medico",
-          "dinheiro",
-        ],
+        hashtags: INSTAGRAM_HASHTAGS,
         resultsPerPage: 20,
       },
       timeoutSecs: 8,
@@ -187,11 +211,9 @@ async function fetchInstagramOptional(apifyToken: string): Promise<unknown[]> {
     {
       actorId: "apify/instagram-scraper",
       input: {
-        directUrls: [
-          "https://www.instagram.com/explore/tags/investimentos/",
-          "https://www.instagram.com/explore/tags/financas/",
-          "https://www.instagram.com/explore/tags/economia/",
-        ],
+        directUrls: INSTAGRAM_HASHTAGS
+          .slice(0, 4)
+          .map((tag) => `https://www.instagram.com/explore/tags/${encodeURIComponent(tag)}/`),
         resultsLimit: 20,
       },
       timeoutSecs: 8,
@@ -453,6 +475,11 @@ export async function POST(req: NextRequest) {
           .map((item) => Object.keys(item).slice(0, 20));
 
       return NextResponse.json({
+        build: BUILD_TAG,
+        monitoredHashtags: {
+          instagram: INSTAGRAM_HASHTAGS,
+          tiktok: TIKTOK_HASHTAGS,
+        },
         counts: {
           instagram: instagram.length,
           tiktok: tiktok.length,
@@ -511,13 +538,24 @@ export async function POST(req: NextRequest) {
       ? mergeUniqueTrends([truncate(socialTrends, 8), nonSocialTrends, socialTrends.slice(8)]).slice(0, 10)
       : truncate(nonSocialTrends, 10);
 
-    return NextResponse.json(trends);
+    return NextResponse.json(trends, {
+      headers: {
+        "Cache-Control": "no-store",
+        "x-resfin-build": BUILD_TAG,
+      },
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[/api/research/trends]", message);
     return NextResponse.json(
       { error: `Erro ao buscar trends: ${message}` },
-      { status: 500 }
+      {
+        status: 500,
+        headers: {
+          "Cache-Control": "no-store",
+          "x-resfin-build": BUILD_TAG,
+        },
+      }
     );
   }
 }
