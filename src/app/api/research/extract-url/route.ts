@@ -35,7 +35,15 @@ async function runApifyActor(
       signal: AbortSignal.timeout(30_000),
     }
   );
-  if (!res.ok) throw new Error(`Apify ${actorId}: ${res.status}`);
+  if (!res.ok) {
+    const details = await res.text().catch(() => "");
+    if (res.status === 402 || res.status === 403) {
+      throw new Error(
+        "Limite/Plano da Apify excedido para extração de conteúdo social."
+      );
+    }
+    throw new Error(`Apify ${actorId}: ${res.status}${details ? ` - ${details.slice(0, 180)}` : ""}`);
+  }
   return res.json();
 }
 

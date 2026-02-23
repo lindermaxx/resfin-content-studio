@@ -616,12 +616,17 @@ export async function POST(req: NextRequest) {
       apifyToken &&
       instagram.length === 0 &&
       tiktok.length === 0 &&
-      socialSourceFailures.some((failure) => failure.includes(": 402"))
+      socialSourceFailures.some(
+        (failure) =>
+          failure.includes(": 402") ||
+          failure.includes(": 403") ||
+          failure.includes("platform-feature-disabled")
+      )
     ) {
       return NextResponse.json(
         {
           error:
-            "Apify sem créditos/plano para coletar Instagram/TikTok. Atualize o plano ou token para habilitar trends sociais.",
+            "Limite mensal da Apify excedido para coleta social (Instagram/TikTok). Atualize o plano/limite para habilitar trends sociais.",
         },
         {
           status: 503,

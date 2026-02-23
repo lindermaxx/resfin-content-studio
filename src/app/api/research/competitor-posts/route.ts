@@ -26,7 +26,15 @@ async function runActor(
       signal: AbortSignal.timeout((timeoutSecs + 5) * 1000),
     }
   );
-  if (!res.ok) throw new Error(`Apify ${actorId}: ${res.status}`);
+  if (!res.ok) {
+    const details = await res.text().catch(() => "");
+    if (res.status === 402 || res.status === 403) {
+      throw new Error(
+        "Limite/Plano da Apify excedido para coletar posts de perfis monitorados."
+      );
+    }
+    throw new Error(`Apify ${actorId}: ${res.status}${details ? ` - ${details.slice(0, 180)}` : ""}`);
+  }
   return res.json();
 }
 
