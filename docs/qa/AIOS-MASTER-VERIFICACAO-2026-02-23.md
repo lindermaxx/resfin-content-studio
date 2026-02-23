@@ -27,6 +27,14 @@ Current production status (latest validation):
 - `POST /api/research/extract-url` for Instagram URL: operational.
 - `POST /api/research/competitor-posts`: operational with explicit no-data guidance when no public posts are found.
 
+Production runtime checkpoint (2026-02-23, after EPIC-05 merge):
+- `GET /api/posts` => `500` with error:
+  - `Could not find the table 'public.posts' in the schema cache`
+- `/pipeline` and `/image` pages in production still show placeholder version.
+- `POST /api/image/generate` and `PATCH /api/posts/:id/image` return `404/405` in production,
+  indicating deploy not yet updated to latest `main`.
+- Vercel CLI is available locally but not authenticated (`vercel whoami` => no credentials).
+
 Completed in codebase (pending post-deploy QA validation):
 - EPIC-04 Story 4.2: Posts API completed
   - `/api/posts` (GET/POST)
@@ -49,13 +57,22 @@ Completed in codebase (pending post-deploy QA validation):
 1. @devops (highest priority)
 - Restore Apify capacity for this project (increase monthly hard limit / plan / token scope).
 - Confirm `APIFY_API_TOKEN` in Vercel points to account with active usage quota.
+- Execute production release ops:
+  - authenticate Vercel CLI (or trigger deploy via dashboard)
+  - redeploy `main` (commit `4c25b19`)
+  - apply `docs/architecture/supabase-schema.sql` in production Supabase
+  - validate image env vars in Vercel (`GOOGLE_AI_API_KEY`, `GOOGLE_IMAGE_MODEL`, `OPENAI_API_KEY`)
 - After update, run smoke checks:
   - `POST /api/research/trends?debug=1`
   - `POST /api/research/competitor-posts`
   - `POST /api/research/extract-url`
+  - `GET /api/posts`
+  - `POST /api/image/generate`
+  - `PATCH /api/posts/:id/image`
 - Acceptance gate:
   - `trends` endpoint remains stable with social cards on consecutive calls.
   - `trends?debug=1` shows at least one active social source (`instagram > 0` or `tiktok > 0`).
+  - `posts` and `image` endpoints respond with contract status (no `404` and no schema `500`).
 
 2. @qa
 - Execute regression on Research flow:

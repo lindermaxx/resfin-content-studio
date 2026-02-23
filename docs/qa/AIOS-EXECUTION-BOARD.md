@@ -9,6 +9,7 @@ Project: resfin-content-studio
 - [x] Lane 3 / EPIC-05 concluída por `@dev` (Stories 5.1, 5.2)
 - [ ] Lane 4 / QA E2E em andamento (code-level validado, runtime pós-deploy pendente)
 - [x] Lane 5 / architect validação de contratos concluída
+- [ ] Lane 1 / devops bloqueada por ambiente de produção desatualizado
 
 ## Lane 1 - @devops
 
@@ -17,8 +18,14 @@ Task:
 - Confirm required env vars in Vercel for image generation providers.
 
 Done when:
-- Tables `posts` and `post_activity_log` exist and are queryable.
-- Smoke check of existing routes still passes after schema apply.
+- [ ] Tables `posts` and `post_activity_log` exist and are queryable.
+- [ ] Smoke check of existing routes still passes after schema apply.
+
+Runtime checkpoint (2026-02-23):
+- `GET /api/posts` => `500` (`Could not find the table 'public.posts' in the schema cache`)
+- `/pipeline` e `/image` em produção ainda mostram placeholder (deploy antigo)
+- `/api/image/generate` e `/api/posts/:id/image` => `404/405` (rotas não publicadas na versão atual)
+- Vercel CLI local: instalado, porém sem credenciais (`vercel whoami` => no credentials)
 
 ## Lane 2 - @dev (EPIC-04)
 
