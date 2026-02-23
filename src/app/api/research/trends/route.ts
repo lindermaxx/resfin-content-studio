@@ -146,7 +146,6 @@ function resolveRequestedHashtags(payload: unknown): string[] {
       .filter(Boolean)
   );
 
-  if (normalizedRequested.length === 0) return INSTAGRAM_HASHTAGS;
   return normalizedRequested.slice(0, MAX_HASHTAGS_PER_EXECUTION);
 }
 
@@ -312,6 +311,15 @@ export async function POST(req: NextRequest) {
     const socialSourceFailures: string[] = [];
     const requestBody = await req.json().catch(() => ({}));
     const selectedHashtags = resolveRequestedHashtags(requestBody);
+    if (selectedHashtags.length === 0) {
+      return NextResponse.json(
+        {
+          error:
+            "Selecione ao menos 1 hashtag antes de executar a busca de trends.",
+        },
+        { status: 400 }
+      );
+    }
     if (!apifyToken) {
       return NextResponse.json(
         { error: "APIFY_API_TOKEN não configurado no servidor." },
