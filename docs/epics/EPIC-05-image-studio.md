@@ -1,6 +1,6 @@
 # EPIC-05 — Image Studio (geração e seleção de imagem)
 
-> **Status:** Ready
+> **Status:** Done
 > **Prioridade:** P2
 > **Criado por:** @pm (Morgan)
 > **Data:** 2026-02-23
@@ -11,17 +11,17 @@ Implementar geração de imagem a partir da copy aprovada, com múltiplas varia�
 
 ## Acceptance Criteria
 
-- [ ] Tela `/image` carrega contexto do post aprovado (tema + copy + visual sugerido)
-- [ ] API `/api/image/generate` gera 2-4 variações por requisição
-- [ ] Fluxo usa provedor principal configurado e fallback automático para OpenAI
-- [ ] Usuário consegue selecionar uma imagem e salvar no post
-- [ ] Usuário consegue regenerar com instrução adicional (refine prompt)
-- [ ] Imagem final aparece no Pipeline vinculada ao post
+- [x] Tela `/image` carrega contexto do post aprovado (tema + copy + visual sugerido)
+- [x] API `/api/image/generate` gera 2-4 variações por requisição
+- [x] Fluxo usa provedor principal configurado e fallback automático para OpenAI
+- [x] Usuário consegue selecionar uma imagem e salvar no post
+- [x] Usuário consegue regenerar com instrução adicional (refine prompt)
+- [x] Imagem final aparece no Pipeline vinculada ao post
 
 ## Stories
 
-- [ ] 5.1 — API de geração de imagem com fallback
-- [ ] 5.2 — UI Image Studio + seleção + regeneração
+- [x] 5.1 — API de geração de imagem com fallback
+- [x] 5.2 — UI Image Studio + seleção + regeneração
 
 ## Dependências
 

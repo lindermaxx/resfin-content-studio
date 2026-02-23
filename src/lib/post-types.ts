@@ -46,6 +46,23 @@ export interface SelectPostImageRequest {
   imagem_prompt: string;
 }
 
+export interface GenerateImageRequest {
+  post_id: string;
+  base_prompt: string;
+  instruction: string | null;
+}
+
+export interface ImageVariant {
+  url: string;
+  provider_image_id: string | null;
+}
+
+export interface GenerateImageResponse {
+  provider: ImageProvider;
+  prompt_used: string;
+  variants: ImageVariant[];
+}
+
 export interface PostRecord {
   id: string;
   created_at: string;
