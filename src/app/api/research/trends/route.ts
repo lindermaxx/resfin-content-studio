@@ -8,30 +8,95 @@ const BUILD_TAG = "trends-social-v6";
 export type { Trend };
 
 const DEFAULT_INSTAGRAM_HASHTAGS = [
+  "financaspessoais",
   "investimentos",
+  "educacaofinanceira",
+  "planejamentofinanceiro",
+  "independenciafinanceira",
+  "reservadeemergencia",
+  "tesouredireto",
+  "fundosimobiliarios",
+  "acoes",
+  "rendavariavel",
+  "rendafixa",
+  "dividendos",
   "financas",
-  "economia",
-  "medicina",
-  "medico",
   "dinheiro",
+  "liberdadefinanceira",
 ];
 
 const DEFAULT_TIKTOK_HASHTAGS = [
-  "financas",
+  "financaspessoais",
   "investimentos",
-  "medicina",
-  "economia",
+  "educacaofinanceira",
+  "planejamentofinanceiro",
+  "independenciafinanceira",
+  "reservadeemergencia",
+  "tesouredireto",
+  "fundosimobiliarios",
+  "acoes",
+  "rendavariavel",
+  "rendafixa",
+  "dividendos",
+  "financas",
   "dinheiro",
-  "fypbrasil",
+  "liberdadefinanceira",
 ];
 
-function parseHashtags(value: string | undefined, fallback: string[]): string[] {
+const DEFAULT_SEED_ACCOUNTS = [
+  "me_poupe",
+  "oracoesfinanceiras",
+  "gustavo_cerbasi",
+  "investindocomcarol",
+  "thalitareis",
+  "leandro_ramos_",
+  "nathfinancas",
+  "ricardolino",
+  "primo_rico",
+];
+
+const DEFAULT_KEYWORDS = [
+  "reserva de emergência",
+  "carteira de investimentos",
+  "renda passiva",
+  "aportar",
+  "CDB",
+  "LCI",
+  "LCA",
+  "tesouro direto",
+  "FII",
+  "dividendos",
+  "juros compostos",
+  "inflação",
+  "IPCA",
+  "dívida",
+  "orçamento",
+  "planilha",
+  "aposentadoria",
+  "PGBL",
+  "VGBL",
+  "previdência",
+];
+
+function parseList(value: string | undefined, fallback: string[]): string[] {
   if (!value?.trim()) return fallback;
-  const tags = value
+  const items = value
     .split(",")
-    .map((tag) => tag.trim().replace(/^#/, ""))
+    .map((item) => item.trim())
     .filter(Boolean);
-  return tags.length > 0 ? tags : fallback;
+  return items.length > 0 ? items : fallback;
+}
+
+function parseHashtags(value: string | undefined, fallback: string[]): string[] {
+  return parseList(value, fallback)
+    .map((tag) => tag.replace(/^#/, "").replace(/\s+/g, ""))
+    .filter(Boolean);
+}
+
+function parseSeedAccounts(value: string | undefined, fallback: string[]): string[] {
+  return parseList(value, fallback)
+    .map((account) => account.replace(/^@/, "").replace(/\s+/g, ""))
+    .filter(Boolean);
 }
 
 const INSTAGRAM_HASHTAGS = parseHashtags(
@@ -41,6 +106,14 @@ const INSTAGRAM_HASHTAGS = parseHashtags(
 const TIKTOK_HASHTAGS = parseHashtags(
   process.env.RESEARCH_TIKTOK_HASHTAGS,
   DEFAULT_TIKTOK_HASHTAGS
+);
+const SEED_ACCOUNTS = parseSeedAccounts(
+  process.env.RESEARCH_SEED_ACCOUNTS,
+  DEFAULT_SEED_ACCOUNTS
+);
+const KEYWORDS = parseList(
+  process.env.RESEARCH_KEYWORDS,
+  DEFAULT_KEYWORDS
 );
 
 // ── Google Trends RSS (Brasil) — instant, no Apify ─────────────────────────
@@ -117,7 +190,10 @@ async function runApifyActor(
     }
   );
 
-  if (!res.ok) throw new Error(`Apify ${actorId}: ${res.status}`);
+  if (!res.ok) {
+    const details = await res.text().catch(() => "");
+    throw new Error(`Apify ${actorId}: ${res.status}${details ? ` - ${details.slice(0, 180)}` : ""}`);
+  }
   return res.json();
 }
 
@@ -133,7 +209,8 @@ async function runApifyFallback(
     actorId: string;
     input: Record<string, unknown>;
     timeoutSecs?: number;
-  }>
+  }>,
+  failures?: string[]
 ): Promise<unknown[]> {
   for (const candidate of candidates) {
     try {
@@ -146,6 +223,8 @@ async function runApifyFallback(
       const cleaned = stripErrorItems(rows);
       if (cleaned.length > 0) return cleaned;
     } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      failures?.push(`${candidate.actorId}: ${message}`);
       console.warn(
         "[/api/research/trends] candidate source failed:",
         candidate.actorId,
@@ -158,25 +237,31 @@ async function runApifyFallback(
 
 // ── Optional social trends via Apify (best-effort) ─────────────────────────
 async function fetchYouTubeOptional(
-  apifyToken: string
+  apifyToken: string,
+  failures?: string[]
 ): Promise<unknown[]> {
-  return runApifyActor(
-    "apify/youtube-scraper",
-    {
-      searchQueries: [
-        "finanças pessoais brasil",
-        "médicos investimentos",
-        "economia brasil semana",
-      ],
-      maxResults: 6,
-      proxyConfiguration: { useApifyProxy: true },
-    },
-    apifyToken,
-    8
-  );
+  const searchQueries = KEYWORDS
+    .slice(0, 6)
+    .map((keyword) => `${keyword} brasil`);
+
+  try {
+    return await runApifyActor(
+      "apify/youtube-scraper",
+      {
+        searchQueries,
+        maxResults: 6,
+        proxyConfiguration: { useApifyProxy: true },
+      },
+      apifyToken,
+      8
+    );
+  } catch (err) {
+    failures?.push(`apify/youtube-scraper: ${err instanceof Error ? err.message : String(err)}`);
+    throw err;
+  }
 }
 
-async function fetchTikTokOptional(apifyToken: string): Promise<unknown[]> {
+async function fetchTikTokOptional(apifyToken: string, failures?: string[]): Promise<unknown[]> {
   return runApifyFallback(apifyToken, [
     {
       actorId: "clockworks/tiktok-trends-scraper",
@@ -195,10 +280,10 @@ async function fetchTikTokOptional(apifyToken: string): Promise<unknown[]> {
       },
       timeoutSecs: 8,
     },
-  ]);
+  ], failures);
 }
 
-async function fetchInstagramOptional(apifyToken: string): Promise<unknown[]> {
+async function fetchInstagramOptional(apifyToken: string, failures?: string[]): Promise<unknown[]> {
   return runApifyFallback(apifyToken, [
     {
       actorId: "apify/instagram-hashtag-scraper",
@@ -222,17 +307,14 @@ async function fetchInstagramOptional(apifyToken: string): Promise<unknown[]> {
       actorId: "apify/instagram-scraper",
       input: {
         usernames: [
-          "nataliaribeiro",
-          "mepoupena",
-          "primonico",
-          "residenciaemfinancas",
+          ...SEED_ACCOUNTS,
         ],
         resultsType: "posts",
         resultsLimit: 18,
       },
       timeoutSecs: 8,
     },
-  ]);
+  ], failures);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -438,18 +520,19 @@ export async function POST(req: NextRequest) {
   try {
     const debug = req.nextUrl.searchParams.get("debug") === "1";
     const apifyToken = process.env.APIFY_API_TOKEN;
+    const socialSourceFailures: string[] = [];
 
     // Run all sources in parallel with hard limits
     const [trendsResult, youtubeResult, tiktokResult, instagramResult] = await Promise.allSettled([
       fetchGoogleTrendsRSS(),
       apifyToken
-        ? fetchYouTubeOptional(apifyToken)
+        ? fetchYouTubeOptional(apifyToken, socialSourceFailures)
         : Promise.resolve([]),
       apifyToken
-        ? fetchTikTokOptional(apifyToken)
+        ? fetchTikTokOptional(apifyToken, socialSourceFailures)
         : Promise.resolve([]),
       apifyToken
-        ? fetchInstagramOptional(apifyToken)
+        ? fetchInstagramOptional(apifyToken, socialSourceFailures)
         : Promise.resolve([]),
     ]);
 
@@ -480,6 +563,9 @@ export async function POST(req: NextRequest) {
           instagram: INSTAGRAM_HASHTAGS,
           tiktok: TIKTOK_HASHTAGS,
         },
+        monitoredSeeds: SEED_ACCOUNTS,
+        monitoredKeywords: KEYWORDS,
+        failures: socialSourceFailures,
         counts: {
           instagram: instagram.length,
           tiktok: tiktok.length,
@@ -523,6 +609,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: "Não foi possível buscar dados de tendências. Tente novamente." },
         { status: 500 }
+      );
+    }
+
+    if (
+      apifyToken &&
+      instagram.length === 0 &&
+      tiktok.length === 0 &&
+      socialSourceFailures.some((failure) => failure.includes(": 402"))
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Apify sem créditos/plano para coletar Instagram/TikTok. Atualize o plano ou token para habilitar trends sociais.",
+        },
+        {
+          status: 503,
+          headers: {
+            "Cache-Control": "no-store",
+            "x-resfin-build": BUILD_TAG,
+          },
+        }
       );
     }
 
