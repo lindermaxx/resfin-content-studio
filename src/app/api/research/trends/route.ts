@@ -240,34 +240,13 @@ async function fetchYouTubeOptional(
   apifyToken: string,
   failures?: string[]
 ): Promise<unknown[]> {
-  const searchQueries = KEYWORDS
-    .slice(0, 6)
-    .map((keyword) => `${keyword} brasil`);
-
-  try {
-    return await runApifyActor(
-      "apify/youtube-scraper",
-      {
-        searchQueries,
-        maxResults: 6,
-        proxyConfiguration: { useApifyProxy: true },
-      },
-      apifyToken,
-      8
-    );
-  } catch (err) {
-    failures?.push(`apify/youtube-scraper: ${err instanceof Error ? err.message : String(err)}`);
-    throw err;
-  }
+  void apifyToken;
+  void failures;
+  return [];
 }
 
 async function fetchTikTokOptional(apifyToken: string, failures?: string[]): Promise<unknown[]> {
   return runApifyFallback(apifyToken, [
-    {
-      actorId: "clockworks/tiktok-trends-scraper",
-      input: { countryCode: "BR", maxItems: 20 },
-      timeoutSecs: 8,
-    },
     {
       actorId: "clockworks/free-tiktok-scraper",
       input: {
@@ -278,21 +257,13 @@ async function fetchTikTokOptional(apifyToken: string, failures?: string[]): Pro
         shouldDownloadSubtitles: false,
         shouldDownloadVideos: false,
       },
-      timeoutSecs: 8,
+      timeoutSecs: 6,
     },
   ], failures);
 }
 
 async function fetchInstagramOptional(apifyToken: string, failures?: string[]): Promise<unknown[]> {
   return runApifyFallback(apifyToken, [
-    {
-      actorId: "apify/instagram-hashtag-scraper",
-      input: {
-        hashtags: INSTAGRAM_HASHTAGS,
-        resultsPerPage: 20,
-      },
-      timeoutSecs: 8,
-    },
     {
       actorId: "apify/instagram-scraper",
       input: {
@@ -301,7 +272,7 @@ async function fetchInstagramOptional(apifyToken: string, failures?: string[]): 
           .map((tag) => `https://www.instagram.com/explore/tags/${encodeURIComponent(tag)}/`),
         resultsLimit: 20,
       },
-      timeoutSecs: 8,
+      timeoutSecs: 10,
     },
     {
       actorId: "apify/instagram-scraper",
@@ -312,7 +283,7 @@ async function fetchInstagramOptional(apifyToken: string, failures?: string[]): 
         resultsType: "posts",
         resultsLimit: 18,
       },
-      timeoutSecs: 8,
+      timeoutSecs: 10,
     },
   ], failures);
 }
