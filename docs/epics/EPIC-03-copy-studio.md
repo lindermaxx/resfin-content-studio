@@ -1,6 +1,6 @@
 # EPIC-03 — Copy Studio (Claude API + Leandro Ladeira)
 
-> **Status:** Ready
+> **Status:** Done
 > **Prioridade:** P1
 > **Data:** 2026-02-22
 
@@ -10,8 +10,8 @@ Implementar o módulo de geração de copy: usuário seleciona formato e voz, Cl
 
 ## Stories
 
-- [ ] 3.1 — API route Claude (`/api/copy/generate`)
-- [ ] 3.2 — Copy Studio UI (seleção de formato/voz, cards de ideias)
+- [x] 3.1 — API route Claude (`/api/copy/generate`)
+- [x] 3.2 — Copy Studio UI (seleção de formato/voz, cards de ideias)
 
 ## Dependências
 

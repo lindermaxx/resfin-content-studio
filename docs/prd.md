@@ -17,9 +17,9 @@ Criar uma aplicação web visual que permite Max Linder operar de forma independ
 O sistema de conteúdo já foi projetado (brief.yaml, tone_guide.md, persona Leandro Ladeira). O que falta é a interface que conecta todas as peças. O app substitui o fluxo atual de "copiar e colar prompts no Claude" por uma experiência guiada e persistente.
 
 ### Stack aprovada
-- **Frontend/Backend:** Next.js 14 (App Router) + TypeScript + Tailwind CSS + shadcn/ui
+- **Frontend/Backend:** Next.js (App Router) + TypeScript + Tailwind CSS + shadcn/ui
 - **Deploy:** Vercel (hobby plan)
-- **Storage:** Vercel KV
+- **Storage:** Supabase
 - **AI Copy:** Anthropic Claude API (`claude-sonnet-4-6`)
 - **AI Research:** Gemini API com Google Search grounding
 - **AI Image:** Google Imagen (NanoBanana) — DALL-E 3 como fallback
@@ -86,7 +86,7 @@ O sistema de conteúdo já foi projetado (brief.yaml, tone_guide.md, persona Lea
 
 ### FR-05 — Pipeline de Conteúdo
 
-**FR-05.1** Todos os posts gerados devem ser salvos automaticamente no Vercel KV com os campos: id, data_criacao, tema, pilar, voz, formato, copy, visual_descricao, cta, keyword_manychat, status (pending / approved / published), imagem_url.
+**FR-05.1** Todos os posts gerados devem ser salvos automaticamente no Supabase com os campos: id, data_criacao, tema, pilar, voz, formato, copy, visual_descricao, cta, keyword_manychat, status (pending / approved / published), imagem_url.
 
 **FR-05.2** O app deve ter uma view de Pipeline com 3 colunas Kanban: **Pending**, **Approved**, **Published**.
 
@@ -120,7 +120,7 @@ O sistema de conteúdo já foi projetado (brief.yaml, tone_guide.md, persona Lea
 - Sem necessidade de servidor dedicado ou manutenção manual
 
 **NFR-05 — Custo**
-- Vercel KV: free tier (30MB storage, 30k requests/mês) — suficiente para MVP
+- Supabase: plano inicial com limites suficientes para MVP
 - APIs pagas monitoradas por request (sem surpresas de billing)
 
 ---
@@ -139,9 +139,9 @@ O sistema de conteúdo já foi projetado (brief.yaml, tone_guide.md, persona Lea
 
 | Épico | Módulo | Stories estimadas | Prioridade |
 |---|---|---|---|
-| EPIC-01 | Setup + Infra (Next.js, Vercel, KV, env vars) | 2 | P0 |
-| EPIC-02 | Research Module (Gemini API + input manual) | 3 | P1 |
-| EPIC-03 | Copy Studio (Claude API + Leandro Ladeira) | 3 | P1 |
+| EPIC-01 | Setup + Infra (Next.js, Vercel, Supabase, env vars) | 2 | P0 |
+| EPIC-02 | Research Module (trends + referências + input manual) | 3 | P1 |
+| EPIC-03 | Copy Studio (Claude API + Leandro Ladeira) | 2 | P1 |
 | EPIC-04 | Review + Pipeline (mockup, KV, kanban) | 4 | P1 |
 | EPIC-05 | Image Studio (Google Imagen + fallback DALL-E) | 2 | P2 |
 
