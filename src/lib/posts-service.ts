@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { getSupabase } from "@/lib/supabase";
 import type { PostActivityEventType, PostStatus } from "@/lib/post-types";
 
 const ALLOWED_TRANSITIONS: Record<PostStatus, PostStatus[]> = {
@@ -30,6 +30,8 @@ export async function logPostActivity(params: {
   actor?: string;
   payload?: Record<string, unknown>;
 }) {
+  const supabase = getSupabase();
+
   const { error } = await supabase.from("post_activity_log").insert({
     post_id: params.postId,
     event_type: params.eventType,

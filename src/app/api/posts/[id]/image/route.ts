@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { getSupabase } from "@/lib/supabase";
 import { logPostActivity, toMetricasArray } from "@/lib/posts-service";
 import type { SelectPostImageRequest } from "@/lib/post-types";
 
@@ -18,6 +18,7 @@ function isValidImageProvider(value: unknown): value is "google" | "openai" {
 
 export async function PATCH(req: NextRequest, context: RouteContext) {
   try {
+    const supabase = getSupabase();
     const id = await resolveId(context);
     if (!id) {
       return NextResponse.json(

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   CheckCircle2,
@@ -173,7 +173,6 @@ function formatFormato(formato: PostFormato): string {
 
 export default function ImagePage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   const [loadingPost, setLoadingPost] = useState(true);
   const [post, setPost] = useState<PostRecord | null>(null);
@@ -197,7 +196,10 @@ export default function ImagePage() {
       setLoadingPost(true);
       setPostError(null);
 
-      const queryPostId = searchParams.get("postId");
+      const queryPostId =
+        typeof window !== "undefined"
+          ? new URLSearchParams(window.location.search).get("postId")
+          : null;
       const sessionPostId =
         typeof window !== "undefined"
           ? sessionStorage.getItem("resfin_active_post_id")
@@ -235,7 +237,7 @@ export default function ImagePage() {
     return () => {
       active = false;
     };
-  }, [searchParams]);
+  }, []);
 
   async function handleGenerate() {
     if (!post) return;

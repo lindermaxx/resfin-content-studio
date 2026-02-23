@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { getSupabase } from "@/lib/supabase";
 import { logPostActivity, toMetricasArray, toPostStatus } from "@/lib/posts-service";
 import type { CreatePostRequest } from "@/lib/post-types";
 
 export async function GET(req: NextRequest) {
   try {
+    const supabase = getSupabase();
     const status = toPostStatus(req.nextUrl.searchParams.get("status"));
 
     let query = supabase
@@ -23,7 +24,7 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json(
-      (data ?? []).map((item) => ({
+      (data ?? []).map((item: Record<string, unknown>) => ({
         ...item,
         metricas: toMetricasArray(item.metricas),
       }))
@@ -39,6 +40,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const supabase = getSupabase();
     const body = (await req.json()) as CreatePostRequest;
 
     if (!body.tema?.trim() || !body.formato || !body.voz || !body.copy_text?.trim()) {
@@ -80,16 +82,30 @@ export async function POST(req: NextRequest) {
         { status: 500 }
       );
     }
+    const createdPost = data as Record<string, unknown>;
+    const createdId =
+      typeof createdPost.id === "string" ? createdPost.id : null;
+
+    if (!createdId) {
+      return NextResponse.json(
+        { error: "Erro ao criar post: ID inválido retornado pelo banco." },
+        { status: 500 }
+      );
+    }
 
     await logPostActivity({
-      postId: data.id,
+      postId: createdId,
       eventType: "created",
       toStatus: "pending",
-      payload: { tema: data.tema, formato: data.formato, voz: data.voz },
+      payload: {
+        tema: createdPost.tema,
+        formato: createdPost.formato,
+        voz: createdPost.voz,
+      },
     });
 
     return NextResponse.json(
-      { ...data, metricas: toMetricasArray(data.metricas) },
+      { ...createdPost, metricas: toMetricasArray(createdPost.metricas) },
       { status: 201 }
     );
   } catch (err) {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { getSupabase } from "@/lib/supabase";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -12,6 +12,7 @@ async function resolveId(context: RouteContext): Promise<string> {
 
 export async function GET(_req: NextRequest, context: RouteContext) {
   try {
+    const supabase = getSupabase();
     const id = await resolveId(context);
     if (!id) {
       return NextResponse.json(
@@ -50,12 +51,16 @@ export async function GET(_req: NextRequest, context: RouteContext) {
       );
     }
 
+    const items = Array.isArray(data)
+      ? (data as Array<Record<string, unknown>>)
+      : [];
+
     return NextResponse.json(
-      (data ?? []).map((item) => ({
+      items.map((item) => ({
         ...item,
         payload:
           item.payload && typeof item.payload === "object"
-            ? item.payload
+            ? (item.payload as Record<string, unknown>)
             : {},
       }))
     );

@@ -1,12 +1,12 @@
-import OpenAI from "openai";
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { getSupabase } from "@/lib/supabase";
 import { logPostActivity } from "@/lib/posts-service";
 import type {
   GenerateImageRequest,
   GenerateImageResponse,
   ImageProvider,
   ImageVariant,
+  PostStatus,
 } from "@/lib/post-types";
 
 export const maxDuration = 60;
@@ -137,16 +137,37 @@ async function generateWithOpenAI(params: {
   apiKey: string;
   model: string;
 }): Promise<ImageVariant[]> {
-  const client = new OpenAI({ apiKey: params.apiKey });
-  const response = await client.images.generate({
-    model: params.model,
-    prompt: params.prompt,
-    n: params.count,
-    size: "1024x1024",
+  const res = await fetch("https://api.openai.com/v1/images/generations", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${params.apiKey}`,
+    },
+    body: JSON.stringify({
+      model: params.model,
+      prompt: params.prompt,
+      n: params.count,
+      size: "1024x1024",
+    }),
+    signal: AbortSignal.timeout(45000),
   });
 
-  const variants: ImageVariant[] = (response.data ?? [])
-    .map((item) => {
+  if (!res.ok) {
+    const details = await res.text().catch(() => "");
+    if (res.status === 401 || res.status === 403 || res.status === 429) {
+      throw new Error("OpenAI retornou falha de autenticação/quota.");
+    }
+    throw new Error(
+      `OpenAI ${res.status}${details ? ` - ${details.slice(0, 180)}` : ""}`
+    );
+  }
+
+  const payload = (await res.json().catch(() => null)) as {
+    data?: Array<{ url?: string | null; b64_json?: string | null }>;
+  } | null;
+
+  const variants = (payload?.data ?? [])
+    .map((item): ImageVariant | null => {
       const url =
         typeof item.url === "string" && item.url
           ? item.url
@@ -172,6 +193,7 @@ async function generateWithOpenAI(params: {
 
 export async function POST(req: NextRequest) {
   try {
+    const supabase = getSupabase();
     const rawBody = (await req.json()) as unknown;
     if (!rawBody || typeof rawBody !== "object") {
       return NextResponse.json(
@@ -194,11 +216,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { data: post, error: postError } = await supabase
+    const { data: postData, error: postError } = await supabase
       .from("posts")
       .select("id,tema,status")
       .eq("id", postId)
       .maybeSingle();
+    const post = postData as
+      | { id: string; tema: string; status: PostStatus }
+      | null;
 
     if (postError) {
       return NextResponse.json(

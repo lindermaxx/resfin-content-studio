@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { getSupabase } from "@/lib/supabase";
 import {
   canTransitionStatus,
   logPostActivity,
@@ -19,6 +19,7 @@ async function resolveId(context: RouteContext): Promise<string> {
 
 export async function PATCH(req: NextRequest, context: RouteContext) {
   try {
+    const supabase = getSupabase();
     const id = await resolveId(context);
     if (!id) {
       return NextResponse.json(
@@ -44,7 +45,7 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
       );
     }
 
-    const { data: currentPost, error: currentError } = await supabase
+    const { data: currentPostData, error: currentError } = await supabase
       .from("posts")
       .select("*")
       .eq("id", id)
@@ -57,11 +58,14 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
       );
     }
 
+    const currentPost = currentPostData as Record<string, unknown> | null;
     if (!currentPost) {
       return NextResponse.json({ error: "Post não encontrado." }, { status: 404 });
     }
 
     const currentStatus = toPostStatus(currentPost.status);
+    const currentApprovedAt =
+      typeof currentPost.approved_at === "string" ? currentPost.approved_at : null;
     if (!currentStatus) {
       return NextResponse.json(
         { error: "Status atual inválido no banco de dados." },
@@ -101,11 +105,11 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
       updatePayload.published_at = null;
     }
     if (nextStatus === "approved") {
-      updatePayload.approved_at = currentPost.approved_at ?? nowIso;
+      updatePayload.approved_at = currentApprovedAt ?? nowIso;
       updatePayload.published_at = null;
     }
     if (nextStatus === "published") {
-      updatePayload.approved_at = currentPost.approved_at ?? nowIso;
+      updatePayload.approved_at = currentApprovedAt ?? nowIso;
       updatePayload.published_at = nowIso;
     }
 

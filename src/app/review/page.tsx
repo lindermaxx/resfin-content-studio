@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   CheckCircle,
@@ -234,7 +234,6 @@ const vozLabel: Record<PostVoz, string> = {
 
 export default function ReviewPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [context, setContext] = useState<StoredCopyContext | null>(null);
@@ -256,7 +255,10 @@ export default function ReviewPage() {
       setLoadingInitial(true);
       setError(null);
 
-      const postId = searchParams.get("postId");
+      const postId =
+        typeof window !== "undefined"
+          ? new URLSearchParams(window.location.search).get("postId")
+          : null;
       if (postId) {
         try {
           const response = await requestJson<unknown>(`/api/posts/${postId}`);
@@ -311,7 +313,7 @@ export default function ReviewPage() {
     return () => {
       active = false;
     };
-  }, [searchParams]);
+  }, []);
 
   async function ensurePost(): Promise<PostRecord> {
     if (post) return post;
