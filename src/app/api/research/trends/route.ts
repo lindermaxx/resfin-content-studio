@@ -117,9 +117,13 @@ async function runApifyFallback(
   return [];
 }
 
-// ── Instagram-only trends via Apify (cost control mode) ────────────────────
+// ── Instagram-only trends via Apify (manual trigger mode) ──────────────────
+function pickSelectedHashtagBatch(hashtags: string[], size = 4): string[] {
+  return hashtags.slice(0, size);
+}
+
 async function fetchInstagramOptional(apifyToken: string, failures?: string[]): Promise<unknown[]> {
-  const selectedBatch = INSTAGRAM_HASHTAGS.slice(0, 4);
+  const selectedBatch = pickSelectedHashtagBatch(INSTAGRAM_HASHTAGS, 4);
 
   return runApifyFallback(apifyToken, [
     {
@@ -244,6 +248,7 @@ export async function POST(req: NextRequest) {
     const debug = req.nextUrl.searchParams.get("debug") === "1";
     const apifyToken = process.env.APIFY_API_TOKEN;
     const socialSourceFailures: string[] = [];
+    const selectedHashtagBatch = pickSelectedHashtagBatch(INSTAGRAM_HASHTAGS, 4);
     if (!apifyToken) {
       return NextResponse.json(
         { error: "APIFY_API_TOKEN não configurado no servidor." },
@@ -266,6 +271,7 @@ export async function POST(req: NextRequest) {
         build: BUILD_TAG,
         mode: "instagram_hashtags_only",
         monitoredHashtags: INSTAGRAM_HASHTAGS,
+        activeHashtagBatch: selectedHashtagBatch,
         disabledSources: ["tiktok", "youtube", "google_trends", "seed_accounts"],
         failures: socialSourceFailures,
         counts: {
