@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import type { Trend } from "@/lib/research-types";
 
 export const maxDuration = 60;
@@ -288,8 +288,9 @@ function mapYouTube(items: unknown[]): Trend[] {
     .slice(0, 6);
 }
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   try {
+    const debug = req.nextUrl.searchParams.get("debug") === "1";
     const apifyToken = process.env.APIFY_API_TOKEN;
 
     // Run all sources in parallel with hard limits
@@ -320,6 +321,27 @@ export async function POST() {
       instagramResult.status === "fulfilled"
         ? truncate(instagramResult.value as unknown[], 12)
         : [];
+
+    if (debug) {
+      const keySample = (value: unknown[]) =>
+        (value as Record<string, unknown>[])
+          .slice(0, 2)
+          .map((item) => Object.keys(item).slice(0, 20));
+
+      return NextResponse.json({
+        counts: {
+          instagram: instagram.length,
+          tiktok: tiktok.length,
+          youtube: youtube.length,
+          google: googleTrends.length,
+        },
+        samples: {
+          instagramKeys: keySample(instagram),
+          tiktokKeys: keySample(tiktok),
+          youtubeKeys: keySample(youtube),
+        },
+      });
+    }
 
     if (trendsResult.status === "rejected") {
       console.warn("[/api/research/trends] Google source failed:", trendsResult.reason);
