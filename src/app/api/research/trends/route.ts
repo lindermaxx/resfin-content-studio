@@ -339,6 +339,9 @@ export async function POST(req: NextRequest) {
           instagramKeys: keySample(instagram),
           tiktokKeys: keySample(tiktok),
           youtubeKeys: keySample(youtube),
+          instagramFirst: (instagram as Record<string, unknown>[])[0] ?? null,
+          tiktokFirst: (tiktok as Record<string, unknown>[])[0] ?? null,
+          youtubeFirst: (youtube as Record<string, unknown>[])[0] ?? null,
         },
       });
     }
