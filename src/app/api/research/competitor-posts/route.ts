@@ -11,13 +11,14 @@ async function runActor(
   token: string,
   timeoutSecs = 25
 ): Promise<unknown[]> {
+  const actorRef = actorId.replace(/\//g, "~");
   const params = new URLSearchParams({
     token,
     timeout: String(timeoutSecs),
     memory: "256",
   });
   const res = await fetch(
-    `https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items?${params}`,
+    `https://api.apify.com/v2/acts/${actorRef}/run-sync-get-dataset-items?${params}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
