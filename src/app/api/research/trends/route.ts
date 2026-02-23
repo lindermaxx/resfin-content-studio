@@ -137,8 +137,18 @@ async function fetchTikTokOptional(apifyToken: string): Promise<unknown[]> {
   return runApifyActor(
     "clockworks/free-tiktok-scraper",
     {
-      type: "trending",
-      limit: 20,
+      hashtags: [
+        "financas",
+        "investimentos",
+        "medicina",
+        "economia",
+        "dinheiro",
+      ],
+      resultsPerPage: 30,
+      shouldDownloadCovers: false,
+      shouldDownloadSlideshowImages: false,
+      shouldDownloadSubtitles: false,
+      shouldDownloadVideos: false,
     },
     apifyToken,
     12
@@ -147,20 +157,22 @@ async function fetchTikTokOptional(apifyToken: string): Promise<unknown[]> {
 
 async function fetchInstagramOptional(apifyToken: string): Promise<unknown[]> {
   return runApifyActor(
-    "apify/instagram-hashtag-scraper",
+    "apify/instagram-scraper",
     {
-      hashtags: [
-        "investimentos",
-        "financas",
-        "economia",
-        "medicina",
-        "medico",
-        "dinheiro",
+      usernames: [
+        "nataliaribeiro",
+        "mepoupena",
+        "primonico",
+        "g4_educacao",
+        "residenciaemfinancas",
+        "medwayresidencia",
+        "medcof",
       ],
-      resultsPerPage: 20,
+      resultsType: "posts",
+      resultsLimit: 40,
     },
     apifyToken,
-    12
+    15
   );
 }
 
@@ -207,6 +219,19 @@ export async function POST() {
       instagramResult.status === "fulfilled"
         ? truncate(instagramResult.value as unknown[], 14)
         : [];
+
+    if (trendsResult.status === "rejected") {
+      console.warn("[/api/research/trends] Google source failed:", trendsResult.reason);
+    }
+    if (youtubeResult.status === "rejected") {
+      console.warn("[/api/research/trends] YouTube source failed:", youtubeResult.reason);
+    }
+    if (tiktokResult.status === "rejected") {
+      console.warn("[/api/research/trends] TikTok source failed:", tiktokResult.reason);
+    }
+    if (instagramResult.status === "rejected") {
+      console.warn("[/api/research/trends] Instagram source failed:", instagramResult.reason);
+    }
 
     console.log(
       `[/api/research/trends] Instagram: ${instagram.length}, TikTok: ${tiktok.length}, YouTube: ${youtube.length}, Google: ${googleTrends.length}`
