@@ -6,9 +6,9 @@ Project: resfin-content-studio
 ## Snapshot (2026-02-23)
 
 - [x] Lane 2 / EPIC-04 concluída por `@dev` (Stories 4.1, 4.2, 4.3, 4.4)
-- [ ] Lane 3 / EPIC-05 pendente (`/api/image/generate` + `/image` UI)
-- [ ] Lane 4 / QA E2E pendente após deploy com EPIC-04
-- [ ] Lane 5 / architect validação final de contratos após EPIC-04
+- [x] Lane 3 / EPIC-05 concluída por `@dev` (Stories 5.1, 5.2)
+- [ ] Lane 4 / QA E2E em andamento (code-level validado, runtime pós-deploy pendente)
+- [x] Lane 5 / architect validação de contratos concluída
 
 ## Lane 1 - @devops
 
@@ -35,12 +35,12 @@ Done when:
 ## Lane 3 - @dev (EPIC-05)
 
 Task:
-- Implement Story 5.1 (`/api/image/generate` with fallback).
-- Implement Story 5.2 (`/image` UI + selection + save).
+- [x] Implement Story 5.1 (`/api/image/generate` with fallback).
+- [x] Implement Story 5.2 (`/image` UI + selection + save).
 
 Done when:
-- `/image` is no longer placeholder.
-- Selected image is persisted and visible in pipeline.
+- [x] `/image` is no longer placeholder.
+- [x] Selected image is persisted and visible in pipeline.
 
 ## Lane 4 - @qa
 
@@ -60,4 +60,4 @@ Task:
 - Validate any contract changes from implementation PRs.
 
 Done when:
-- API contracts and DB schema remain aligned with code.
+- [x] API contracts and DB schema remain aligned with code.

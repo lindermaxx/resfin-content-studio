@@ -3,7 +3,7 @@
 Date: 2026-02-23
 Agent: aios-master (Orion)
 Project: resfin-content-studio
-Updated at: 2026-02-23 (EPIC-04 delivery checkpoint)
+Updated at: 2026-02-23 (EPIC-04/05 delivery checkpoint)
 
 ## 1) Verification Summary
 
@@ -37,6 +37,12 @@ Completed in codebase (pending post-deploy QA validation):
 - EPIC-04 Story 4.3: `/pipeline` implemented (3 colunas + transições de status)
 - EPIC-04 Story 4.4: timeline de atividade exibida por card no Pipeline
 - Story docs updated to `Done` for `4.1`, `4.2`, `4.3`, `4.4`
+- EPIC-05 Story 5.1: image API implemented
+  - `/api/image/generate` (Google primary + OpenAI fallback)
+  - `/api/posts/:id/image` (persistência de imagem selecionada)
+- EPIC-05 Story 5.2: `/image` implemented
+  - geração, regeneração, seleção e persistência da imagem
+- Story docs updated to `Done` for `5.1`, `5.2`
 
 ## 2) Delegated Instructions by Agent
 
@@ -56,6 +62,10 @@ Completed in codebase (pending post-deploy QA validation):
   - Trends fetch success and timeout behavior
   - Profiles monitored (list + no crashes)
   - URL extract for Instagram/TikTok/YouTube/article
+- Execute regression on Image flow:
+  - `/image` loading with approved post
+  - generation endpoint success/fallback/error states
+  - persistence of selected image on pipeline card
 - Validate error UX text in Portuguese for quota-limit scenarios.
 - Validate no-data scenario UX for monitored profiles (new explicit 404 message).
 - Record evidence (request payload + response + status code) in QA notes.
@@ -67,21 +77,19 @@ Completed in codebase (pending post-deploy QA validation):
   - `RESEARCH_SEED_ACCOUNTS`
   - `RESEARCH_KEYWORDS`
 - Remove debug-only payload fields from production response once QA passes.
-- Start EPIC-05 implementation in sequence:
-  - Story 5.1 (`/api/image/generate` with provider fallback)
-  - Story 5.2 (`/image` UI + image selection persistence)
+- Resolve residual QA findings (if any) and proceed only with polishing/perf tasks.
 
 4. @architect
 - Validate long-term social ingestion strategy (cost/reliability):
   - Apify-only vs mixed providers
   - Quota-aware fallback policy
 - Define architecture note for source-priority logic and fail-open vs fail-closed behavior.
-- Validate EPIC-04 implementation against `docs/architecture/epic-04-05-architecture.md`
-  and flag any contract divergence before EPIC-05 merge.
+- Validate EPIC-04/05 implementation against `docs/architecture/epic-04-05-architecture.md`
+  and flag any contract divergence before release.
 
 5. @pm / @sm / @po
 - Track blocker as external dependency (Apify quota).
-- Mark EPIC-04 as delivered and move execution focus to EPIC-05 + QA E2E sign-off.
+- Mark EPIC-04 and EPIC-05 as delivered and move execution focus to QA E2E sign-off.
 - Use stories in `docs/stories/4.x` and `docs/stories/5.x` as source of truth.
 
 ## 3) Finalization Plan (Execution)
@@ -98,7 +106,7 @@ Phase B - Validation Hardening
 
 Phase C - Complete MVP Remaining Scope
 1. [x] Implement EPIC-04 (Review + Pipeline).
-2. [ ] Implement EPIC-05 (Image Studio + fallback).
+2. [x] Implement EPIC-05 (Image Studio + fallback).
 3. [ ] E2E validation for full funnel:
    Research -> Copy -> Review -> Image -> Pipeline.
 
