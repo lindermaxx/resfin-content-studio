@@ -2,9 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabase } from "@/lib/supabase";
 import {
   canTransitionStatus,
+  getPostFallback,
   logPostActivity,
+  shouldUseStorageFallback,
   toMetricasArray,
   toPostStatus,
+  updatePostFallback,
 } from "@/lib/posts-service";
 import type { PostStatus, UpdatePostStatusRequest } from "@/lib/post-types";
 
@@ -19,7 +22,6 @@ async function resolveId(context: RouteContext): Promise<string> {
 
 export async function PATCH(req: NextRequest, context: RouteContext) {
   try {
-    const supabase = getSupabase();
     const id = await resolveId(context);
     if (!id) {
       return NextResponse.json(
@@ -45,20 +47,35 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
       );
     }
 
-    const { data: currentPostData, error: currentError } = await supabase
-      .from("posts")
-      .select("*")
-      .eq("id", id)
-      .maybeSingle();
+    const useFallbackNow = shouldUseStorageFallback();
+    const supabase = useFallbackNow ? null : getSupabase();
 
-    if (currentError) {
-      return NextResponse.json(
-        { error: `Erro ao atualizar status: ${currentError.message}` },
-        { status: 500 }
-      );
+    let currentPost: Record<string, unknown> | null = null;
+    if (useFallbackNow) {
+      currentPost = (await getPostFallback(id)) as unknown as Record<string, unknown> | null;
+    } else {
+      const { data: currentPostData, error: currentError } = await supabase!
+        .from("posts")
+        .select("*")
+        .eq("id", id)
+        .maybeSingle();
+
+      if (currentError) {
+        if (shouldUseStorageFallback(currentError.message)) {
+          currentPost = (await getPostFallback(id)) as unknown as
+            | Record<string, unknown>
+            | null;
+        } else {
+          return NextResponse.json(
+            { error: `Erro ao atualizar status: ${currentError.message}` },
+            { status: 500 }
+          );
+        }
+      } else {
+        currentPost = currentPostData as Record<string, unknown> | null;
+      }
     }
 
-    const currentPost = currentPostData as Record<string, unknown> | null;
     if (!currentPost) {
       return NextResponse.json({ error: "Post não encontrado." }, { status: 404 });
     }
@@ -113,18 +130,35 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
       updatePayload.published_at = nowIso;
     }
 
-    const { data: updatedPost, error: updateError } = await supabase
-      .from("posts")
-      .update(updatePayload)
-      .eq("id", id)
-      .select("*")
-      .maybeSingle();
+    let updatedPost: Record<string, unknown> | null = null;
+    if (shouldUseStorageFallback()) {
+      updatedPost = (await updatePostFallback(
+        id,
+        updatePayload as unknown as Record<string, unknown>
+      )) as unknown as Record<string, unknown> | null;
+    } else {
+      const { data: dbUpdatedPost, error: updateError } = await supabase!
+        .from("posts")
+        .update(updatePayload)
+        .eq("id", id)
+        .select("*")
+        .maybeSingle();
 
-    if (updateError) {
-      return NextResponse.json(
-        { error: `Erro ao atualizar status: ${updateError.message}` },
-        { status: 500 }
-      );
+      if (updateError) {
+        if (shouldUseStorageFallback(updateError.message)) {
+          updatedPost = (await updatePostFallback(
+            id,
+            updatePayload as unknown as Record<string, unknown>
+          )) as unknown as Record<string, unknown> | null;
+        } else {
+          return NextResponse.json(
+            { error: `Erro ao atualizar status: ${updateError.message}` },
+            { status: 500 }
+          );
+        }
+      } else {
+        updatedPost = dbUpdatedPost as Record<string, unknown> | null;
+      }
     }
 
     if (!updatedPost) {

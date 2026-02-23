@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabase } from "@/lib/supabase";
-import { logPostActivity, toMetricasArray } from "@/lib/posts-service";
+import {
+  logPostActivity,
+  shouldUseStorageFallback,
+  toMetricasArray,
+  updatePostFallback,
+} from "@/lib/posts-service";
 import type { SelectPostImageRequest } from "@/lib/post-types";
 
 type RouteContext = {
@@ -18,7 +23,6 @@ function isValidImageProvider(value: unknown): value is "google" | "openai" {
 
 export async function PATCH(req: NextRequest, context: RouteContext) {
   try {
-    const supabase = getSupabase();
     const id = await resolveId(context);
     if (!id) {
       return NextResponse.json(
@@ -51,22 +55,42 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
       );
     }
 
-    const { data: updatedPost, error } = await supabase
-      .from("posts")
-      .update({
-        imagem_url: imagemUrl,
-        imagem_provider: body.imagem_provider,
-        imagem_prompt: imagemPrompt,
-      })
-      .eq("id", id)
-      .select("*")
-      .maybeSingle();
+    const updatePayload = {
+      imagem_url: imagemUrl,
+      imagem_provider: body.imagem_provider,
+      imagem_prompt: imagemPrompt,
+    };
 
-    if (error) {
-      return NextResponse.json(
-        { error: `Erro ao salvar imagem no post: ${error.message}` },
-        { status: 500 }
-      );
+    let updatedPost: Record<string, unknown> | null = null;
+    if (shouldUseStorageFallback()) {
+      updatedPost = (await updatePostFallback(
+        id,
+        updatePayload as unknown as Record<string, unknown>
+      )) as unknown as Record<string, unknown> | null;
+    } else {
+      const supabase = getSupabase();
+      const { data: dbUpdatedPost, error } = await supabase
+        .from("posts")
+        .update(updatePayload)
+        .eq("id", id)
+        .select("*")
+        .maybeSingle();
+
+      if (error) {
+        if (shouldUseStorageFallback(error.message)) {
+          updatedPost = (await updatePostFallback(
+            id,
+            updatePayload as unknown as Record<string, unknown>
+          )) as unknown as Record<string, unknown> | null;
+        } else {
+          return NextResponse.json(
+            { error: `Erro ao salvar imagem no post: ${error.message}` },
+            { status: 500 }
+          );
+        }
+      } else {
+        updatedPost = dbUpdatedPost as Record<string, unknown> | null;
+      }
     }
 
     if (!updatedPost) {

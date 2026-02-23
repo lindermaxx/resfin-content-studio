@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabase } from "@/lib/supabase";
-import { logPostActivity } from "@/lib/posts-service";
+import {
+  getPostFallback,
+  logPostActivity,
+  shouldUseStorageFallback,
+} from "@/lib/posts-service";
 import type {
   GenerateImageRequest,
   GenerateImageResponse,
@@ -193,7 +197,6 @@ async function generateWithOpenAI(params: {
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = getSupabase();
     const rawBody = (await req.json()) as unknown;
     if (!rawBody || typeof rawBody !== "object") {
       return NextResponse.json(
@@ -216,20 +219,43 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { data: postData, error: postError } = await supabase
-      .from("posts")
-      .select("id,tema,status")
-      .eq("id", postId)
-      .maybeSingle();
-    const post = postData as
-      | { id: string; tema: string; status: PostStatus }
-      | null;
+    let post: { id: string; tema: string; status: PostStatus } | null = null;
+    if (shouldUseStorageFallback()) {
+      const fallbackPost = await getPostFallback(postId);
+      if (fallbackPost) {
+        post = {
+          id: fallbackPost.id,
+          tema: fallbackPost.tema,
+          status: fallbackPost.status,
+        };
+      }
+    } else {
+      const supabase = getSupabase();
+      const { data: postData, error: postError } = await supabase
+        .from("posts")
+        .select("id,tema,status")
+        .eq("id", postId)
+        .maybeSingle();
 
-    if (postError) {
-      return NextResponse.json(
-        { error: `Erro ao carregar post: ${postError.message}` },
-        { status: 500 }
-      );
+      if (postError) {
+        if (shouldUseStorageFallback(postError.message)) {
+          const fallbackPost = await getPostFallback(postId);
+          if (fallbackPost) {
+            post = {
+              id: fallbackPost.id,
+              tema: fallbackPost.tema,
+              status: fallbackPost.status,
+            };
+          }
+        } else {
+          return NextResponse.json(
+            { error: `Erro ao carregar post: ${postError.message}` },
+            { status: 500 }
+          );
+        }
+      } else {
+        post = postData as { id: string; tema: string; status: PostStatus } | null;
+      }
     }
 
     if (!post) {

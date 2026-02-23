@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabase } from "@/lib/supabase";
+import {
+  getPostFallback,
+  listPostActivityFallback,
+  shouldUseStorageFallback,
+} from "@/lib/posts-service";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -12,7 +17,6 @@ async function resolveId(context: RouteContext): Promise<string> {
 
 export async function GET(_req: NextRequest, context: RouteContext) {
   try {
-    const supabase = getSupabase();
     const id = await resolveId(context);
     if (!id) {
       return NextResponse.json(
@@ -20,6 +24,15 @@ export async function GET(_req: NextRequest, context: RouteContext) {
         { status: 400 }
       );
     }
+    if (shouldUseStorageFallback()) {
+      const post = await getPostFallback(id);
+      if (!post) {
+        return NextResponse.json({ error: "Post não encontrado." }, { status: 404 });
+      }
+      return NextResponse.json(await listPostActivityFallback(id));
+    }
+
+    const supabase = getSupabase();
 
     const { data: post, error: postError } = await supabase
       .from("posts")
@@ -28,6 +41,14 @@ export async function GET(_req: NextRequest, context: RouteContext) {
       .maybeSingle();
 
     if (postError) {
+      if (shouldUseStorageFallback(postError.message)) {
+        const fallbackPost = await getPostFallback(id);
+        if (!fallbackPost) {
+          return NextResponse.json({ error: "Post não encontrado." }, { status: 404 });
+        }
+        return NextResponse.json(await listPostActivityFallback(id));
+      }
+
       return NextResponse.json(
         { error: `Erro ao buscar atividade: ${postError.message}` },
         { status: 500 }
@@ -45,6 +66,10 @@ export async function GET(_req: NextRequest, context: RouteContext) {
       .order("created_at", { ascending: false });
 
     if (error) {
+      if (shouldUseStorageFallback(error.message)) {
+        return NextResponse.json(await listPostActivityFallback(id));
+      }
+
       return NextResponse.json(
         { error: `Erro ao buscar atividade: ${error.message}` },
         { status: 500 }

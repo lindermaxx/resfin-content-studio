@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabase } from "@/lib/supabase";
-import { logPostActivity, toMetricasArray } from "@/lib/posts-service";
+import {
+  getPostFallback,
+  logPostActivity,
+  shouldUseStorageFallback,
+  toMetricasArray,
+  updatePostFallback,
+} from "@/lib/posts-service";
 import type { UpdatePostRequest } from "@/lib/post-types";
 
 type RouteContext = {
@@ -96,7 +102,6 @@ function buildUpdatePayload(body: UpdatePostRequest): {
 
 export async function GET(_req: NextRequest, context: RouteContext) {
   try {
-    const supabase = getSupabase();
     const id = await resolveId(context);
     if (!id) {
       return NextResponse.json(
@@ -104,6 +109,15 @@ export async function GET(_req: NextRequest, context: RouteContext) {
         { status: 400 }
       );
     }
+    if (shouldUseStorageFallback()) {
+      const fallbackPost = await getPostFallback(id);
+      if (!fallbackPost) {
+        return NextResponse.json({ error: "Post não encontrado." }, { status: 404 });
+      }
+      return NextResponse.json(fallbackPost);
+    }
+
+    const supabase = getSupabase();
 
     const { data, error } = await supabase
       .from("posts")
@@ -112,6 +126,14 @@ export async function GET(_req: NextRequest, context: RouteContext) {
       .maybeSingle();
 
     if (error) {
+      if (shouldUseStorageFallback(error.message)) {
+        const fallbackPost = await getPostFallback(id);
+        if (!fallbackPost) {
+          return NextResponse.json({ error: "Post não encontrado." }, { status: 404 });
+        }
+        return NextResponse.json(fallbackPost);
+      }
+
       return NextResponse.json(
         { error: `Erro ao buscar post: ${error.message}` },
         { status: 500 }
@@ -134,7 +156,6 @@ export async function GET(_req: NextRequest, context: RouteContext) {
 
 export async function PATCH(req: NextRequest, context: RouteContext) {
   try {
-    const supabase = getSupabase();
     const id = await resolveId(context);
     if (!id) {
       return NextResponse.json(
@@ -157,6 +178,26 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
     if (validationError) {
       return NextResponse.json({ error: validationError }, { status: 400 });
     }
+    if (shouldUseStorageFallback()) {
+      const updatedPost = await updatePostFallback(
+        id,
+        payload as unknown as Record<string, unknown>
+      );
+
+      if (!updatedPost) {
+        return NextResponse.json({ error: "Post não encontrado." }, { status: 404 });
+      }
+
+      await logPostActivity({
+        postId: id,
+        eventType: "edited",
+        payload: { updated_fields: updatedFields },
+      });
+
+      return NextResponse.json(updatedPost);
+    }
+
+    const supabase = getSupabase();
 
     const { data, error } = await supabase
       .from("posts")
@@ -166,6 +207,25 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
       .maybeSingle();
 
     if (error) {
+      if (shouldUseStorageFallback(error.message)) {
+        const updatedPost = await updatePostFallback(
+          id,
+          payload as unknown as Record<string, unknown>
+        );
+
+        if (!updatedPost) {
+          return NextResponse.json({ error: "Post não encontrado." }, { status: 404 });
+        }
+
+        await logPostActivity({
+          postId: id,
+          eventType: "edited",
+          payload: { updated_fields: updatedFields },
+        });
+
+        return NextResponse.json(updatedPost);
+      }
+
       return NextResponse.json(
         { error: `Erro ao atualizar post: ${error.message}` },
         { status: 500 }

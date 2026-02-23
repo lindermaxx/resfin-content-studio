@@ -1,12 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabase } from "@/lib/supabase";
-import { logPostActivity, toMetricasArray, toPostStatus } from "@/lib/posts-service";
+import {
+  createPostFallback,
+  listPostsFallback,
+  logPostActivity,
+  shouldUseStorageFallback,
+  toMetricasArray,
+  toPostStatus,
+} from "@/lib/posts-service";
 import type { CreatePostRequest } from "@/lib/post-types";
 
 export async function GET(req: NextRequest) {
   try {
-    const supabase = getSupabase();
     const status = toPostStatus(req.nextUrl.searchParams.get("status"));
+    if (shouldUseStorageFallback()) {
+      const fallbackPosts = await listPostsFallback(status);
+      return NextResponse.json(fallbackPosts);
+    }
+
+    const supabase = getSupabase();
 
     let query = supabase
       .from("posts")
@@ -17,6 +29,11 @@ export async function GET(req: NextRequest) {
 
     const { data, error } = await query;
     if (error) {
+      if (shouldUseStorageFallback(error.message)) {
+        const fallbackPosts = await listPostsFallback(status);
+        return NextResponse.json(fallbackPosts);
+      }
+
       return NextResponse.json(
         { error: `Erro ao buscar posts: ${error.message}` },
         { status: 500 }
@@ -40,7 +57,6 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = getSupabase();
     const body = (await req.json()) as CreatePostRequest;
 
     if (!body.tema?.trim() || !body.formato || !body.voz || !body.copy_text?.trim()) {
@@ -69,6 +85,26 @@ export async function POST(req: NextRequest) {
       status: "pending" as const,
       status_updated_at: new Date().toISOString(),
     };
+    if (shouldUseStorageFallback()) {
+      const createdPost = await createPostFallback(
+        payload as unknown as Record<string, unknown>
+      );
+
+      await logPostActivity({
+        postId: createdPost.id,
+        eventType: "created",
+        toStatus: "pending",
+        payload: {
+          tema: createdPost.tema,
+          formato: createdPost.formato,
+          voz: createdPost.voz,
+        },
+      });
+
+      return NextResponse.json(createdPost, { status: 201 });
+    }
+
+    const supabase = getSupabase();
 
     const { data, error } = await supabase
       .from("posts")
@@ -76,9 +112,35 @@ export async function POST(req: NextRequest) {
       .select("*")
       .single();
 
-    if (error || !data) {
+    if (error) {
+      if (shouldUseStorageFallback(error.message)) {
+        const createdPost = await createPostFallback(
+          payload as unknown as Record<string, unknown>
+        );
+
+        await logPostActivity({
+          postId: createdPost.id,
+          eventType: "created",
+          toStatus: "pending",
+          payload: {
+            tema: createdPost.tema,
+            formato: createdPost.formato,
+            voz: createdPost.voz,
+          },
+        });
+
+        return NextResponse.json(createdPost, { status: 201 });
+      }
+
       return NextResponse.json(
-        { error: `Erro ao criar post: ${error?.message ?? "registro não criado"}` },
+        { error: `Erro ao criar post: ${error.message}` },
+        { status: 500 }
+      );
+    }
+
+    if (!data) {
+      return NextResponse.json(
+        { error: "Erro ao criar post: registro não criado." },
         { status: 500 }
       );
     }
