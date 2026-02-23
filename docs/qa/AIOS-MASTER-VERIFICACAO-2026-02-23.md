@@ -3,6 +3,7 @@
 Date: 2026-02-23
 Agent: aios-master (Orion)
 Project: resfin-content-studio
+Updated at: 2026-02-23 (EPIC-04 delivery checkpoint)
 
 ## 1) Verification Summary
 
@@ -25,6 +26,17 @@ Current production status (latest validation):
   - Typical distribution: `Instagram=8`, `Google Trends=2` (10 total cards).
 - `POST /api/research/extract-url` for Instagram URL: operational.
 - `POST /api/research/competitor-posts`: operational with explicit no-data guidance when no public posts are found.
+
+Completed in codebase (pending post-deploy QA validation):
+- EPIC-04 Story 4.2: Posts API completed
+  - `/api/posts` (GET/POST)
+  - `/api/posts/:id` (GET/PATCH)
+  - `/api/posts/:id/status` (PATCH)
+  - `/api/posts/:id/activity` (GET)
+- EPIC-04 Story 4.1: `/review` implemented (editor + mockup + actions Aprovar/Rejeitar/Nova versão)
+- EPIC-04 Story 4.3: `/pipeline` implemented (3 colunas + transições de status)
+- EPIC-04 Story 4.4: timeline de atividade exibida por card no Pipeline
+- Story docs updated to `Done` for `4.1`, `4.2`, `4.3`, `4.4`
 
 ## 2) Delegated Instructions by Agent
 
@@ -55,17 +67,21 @@ Current production status (latest validation):
   - `RESEARCH_SEED_ACCOUNTS`
   - `RESEARCH_KEYWORDS`
 - Remove debug-only payload fields from production response once QA passes.
-- Start EPIC-04 implementation in sequence (Review + Pipeline) using stories 4.1-4.4.
+- Start EPIC-05 implementation in sequence:
+  - Story 5.1 (`/api/image/generate` with provider fallback)
+  - Story 5.2 (`/image` UI + image selection persistence)
 
 4. @architect
 - Validate long-term social ingestion strategy (cost/reliability):
   - Apify-only vs mixed providers
   - Quota-aware fallback policy
 - Define architecture note for source-priority logic and fail-open vs fail-closed behavior.
+- Validate EPIC-04 implementation against `docs/architecture/epic-04-05-architecture.md`
+  and flag any contract divergence before EPIC-05 merge.
 
 5. @pm / @sm / @po
 - Track blocker as external dependency (Apify quota).
-- Keep EPIC-04 as next execution focus once blocker is mitigated.
+- Mark EPIC-04 as delivered and move execution focus to EPIC-05 + QA E2E sign-off.
 - Use stories in `docs/stories/4.x` and `docs/stories/5.x` as source of truth.
 
 ## 3) Finalization Plan (Execution)
@@ -81,9 +97,9 @@ Phase B - Validation Hardening
 3. Production smoke test and sign-off.
 
 Phase C - Complete MVP Remaining Scope
-1. Implement EPIC-04 (Review + Pipeline).
-2. Implement EPIC-05 (Image Studio + fallback).
-3. E2E validation for full funnel:
+1. [x] Implement EPIC-04 (Review + Pipeline).
+2. [ ] Implement EPIC-05 (Image Studio + fallback).
+3. [ ] E2E validation for full funnel:
    Research -> Copy -> Review -> Image -> Pipeline.
 
 ## 4) AIOS Master Authorization

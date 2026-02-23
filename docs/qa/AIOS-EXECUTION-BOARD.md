@@ -3,6 +3,13 @@
 Date: 2026-02-23  
 Project: resfin-content-studio
 
+## Snapshot (2026-02-23)
+
+- [x] Lane 2 / EPIC-04 concluída por `@dev` (Stories 4.1, 4.2, 4.3, 4.4)
+- [ ] Lane 3 / EPIC-05 pendente (`/api/image/generate` + `/image` UI)
+- [ ] Lane 4 / QA E2E pendente após deploy com EPIC-04
+- [ ] Lane 5 / architect validação final de contratos após EPIC-04
+
 ## Lane 1 - @devops
 
 Task:
@@ -16,14 +23,14 @@ Done when:
 ## Lane 2 - @dev (EPIC-04)
 
 Task:
-- Implement Story 4.2 first (posts API).
-- Implement Story 4.1 (Review UI with approve/reject/new version).
-- Implement Story 4.3 (Pipeline board with status transitions).
-- Implement Story 4.4 (activity log visualization).
+- [x] Implement Story 4.2 first (posts API).
+- [x] Implement Story 4.1 (Review UI with approve/reject/new version).
+- [x] Implement Story 4.3 (Pipeline board with status transitions).
+- [x] Implement Story 4.4 (activity log visualization).
 
 Done when:
-- `/review` and `/pipeline` are no longer placeholders.
-- Status transitions are persisted and logged.
+- [x] `/review` and `/pipeline` are no longer placeholders.
+- [x] Status transitions are persisted and logged.
 
 ## Lane 3 - @dev (EPIC-05)
 
@@ -54,4 +61,3 @@ Task:
 
 Done when:
 - API contracts and DB schema remain aligned with code.
-
