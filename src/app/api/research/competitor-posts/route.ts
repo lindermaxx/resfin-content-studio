@@ -57,6 +57,33 @@ function detectTipo(post: Record<string, unknown>): CompetitorPost["tipo"] {
   return "post";
 }
 
+function flattenInstagramItems(items: unknown[]): Record<string, unknown>[] {
+  const out: Record<string, unknown>[] = [];
+
+  for (const raw of items as Record<string, unknown>[]) {
+    if (!raw || typeof raw !== "object") continue;
+
+    const latestPosts = raw.latestPosts as Record<string, unknown>[] | undefined;
+    if (Array.isArray(latestPosts) && latestPosts.length > 0) {
+      const parentUsername = (raw.username as string) || (raw.ownerUsername as string) || "";
+      for (const post of latestPosts) {
+        out.push({
+          ...post,
+          ownerUsername:
+            (post.ownerUsername as string) ||
+            (post.username as string) ||
+            parentUsername,
+        });
+      }
+      continue;
+    }
+
+    out.push(raw);
+  }
+
+  return out;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { handles } = await req.json() as { handles: string[] };
@@ -76,17 +103,32 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Fetch recent posts for all profiles — Instagram scraper supports array of usernames
-    const items = await runActor(
+    // Primary strategy: usernames
+    let items = await runActor(
       "apify/instagram-scraper",
       {
-        usernames: handles,
+        usernames: handles.map((h) => h.replace(/^@/, "")),
         resultsLimit: 12, // últimos 12 posts por perfil
         resultsType: "posts",
       },
       apifyToken,
       50
     );
+
+    // Fallback strategy: direct profile URLs when usernames returns empty
+    if (!Array.isArray(items) || items.length === 0) {
+      items = await runActor(
+        "apify/instagram-scraper",
+        {
+          directUrls: handles.map((h) => `https://www.instagram.com/${h.replace(/^@/, "")}/`),
+          resultsLimit: 20,
+        },
+        apifyToken,
+        50
+      );
+    }
+
+    const normalizedItems = flattenInstagramItems(items);
 
     const mapPost = (item: Record<string, unknown>): CompetitorPost => {
         const likes = (item.likesCount as number) || 0;
@@ -109,7 +151,7 @@ export async function POST(req: NextRequest) {
         };
       };
 
-    const allPosts = (items as Record<string, unknown>[])
+    const allPosts = normalizedItems
       .map(mapPost)
       .filter((post) => Boolean(post.url && post.username));
 
