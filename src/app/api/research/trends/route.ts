@@ -249,6 +249,47 @@ function safeSlice(text: string, max: number): string {
   return text ? text.slice(0, max) : "";
 }
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+function hoursSince(timestamp: string): number {
+  const parsed = Date.parse(timestamp);
+  if (!Number.isFinite(parsed)) return 999;
+  const diffMs = Date.now() - parsed;
+  return Math.max(0, diffMs / (1000 * 60 * 60));
+}
+
+function formatRecencyMetric(hours: number): string {
+  if (!Number.isFinite(hours) || hours >= 999) return "";
+  if (hours < 1) return "publicado agora";
+  if (hours < 24) return `há ${Math.round(hours)}h`;
+  return `há ${Math.round(hours / 24)}d`;
+}
+
+function computeInstagramTractionScore(params: {
+  likes: number;
+  comments: number;
+  views: number;
+  hours: number;
+}): number {
+  const { likes, comments, views, hours } = params;
+
+  // Base de volume sem custo extra: só usa métricas nativas retornadas pelo actor.
+  const volumeBase = likes + comments * 8 + views * 0.04;
+  const volumeScore = Math.log1p(volumeBase + 1) * 100;
+
+  // Comentários indicam discussão real; boost limitado para evitar distorção.
+  const conversationRate = comments / Math.max(likes, 1);
+  const conversationBoost = clamp(1 + conversationRate * 1.5, 1, 1.8);
+
+  // Recência: favorece conteúdo recente sem zerar posts mais antigos.
+  const freshnessBoost =
+    hours <= 24 ? 1.35 : hours <= 72 ? 1.15 : hours <= 168 ? 1 : 0.85;
+
+  return volumeScore * conversationBoost * freshnessBoost;
+}
+
 function mergeUniqueTrends(lists: Trend[][]): Trend[] {
   const seen = new Set<string>();
   const out: Trend[] = [];
@@ -265,12 +306,14 @@ function mergeUniqueTrends(lists: Trend[][]): Trend[] {
 }
 
 function mapInstagram(items: unknown[]): Trend[] {
-  return (items as unknown[])
+  const ranked = (items as unknown[])
     .map((raw) => {
       const item = asRecord(raw);
       const likes = pickNumber(item, ["likesCount", "likes", "likes_count"]);
       const comments = pickNumber(item, ["commentsCount", "comments", "comments_count"]);
       const views = pickNumber(item, ["videoViewCount", "viewCount", "views", "playCount"]);
+      const timestamp = pickString(item, ["timestamp", "takenAt", "createdAt"]);
+      const ageHours = hoursSince(timestamp);
       const caption = pickString(item, ["caption", "text", "title", "description"]);
       const owner =
         pickString(item, ["ownerUsername", "username", "owner", "author"]) ||
@@ -279,29 +322,42 @@ function mapInstagram(items: unknown[]): Trend[] {
       const hashtag = pickString(item, ["hashtag", "tag"]);
       const titulo = safeSlice(caption, 90) || (hashtag ? `#${hashtag}` : `Post de @${owner || "instagram"}`);
       const contexto = caption || "Post com alta interação no Instagram.";
-      const score = likes + comments * 5 + Math.round(views * 0.05);
+      const weakSignal = views < 120 && likes < 6 && comments < 2;
+      const tractionScore = computeInstagramTractionScore({
+        likes,
+        comments,
+        views,
+        hours: ageHours,
+      });
+      const score = weakSignal ? tractionScore * 0.35 : tractionScore;
       const url = pickString(item, ["url", "postUrl", "shortCodeUrl", "inputUrl"]);
+      const recencyMetric = formatRecencyMetric(ageHours);
 
       return {
         trend: {
           titulo,
           plataforma: "Instagram",
           metricas: buildMetricas([
+            views > 0 ? `${views.toLocaleString("pt-BR")} views` : "",
             likes > 0 ? `${likes.toLocaleString("pt-BR")} likes` : "",
             comments > 0 ? `${comments.toLocaleString("pt-BR")} comentários` : "",
-            views > 0 ? `${views.toLocaleString("pt-BR")} views` : "",
+            recencyMetric,
           ]),
           fonte: owner ? `@${owner}` : "Instagram",
           url,
           contexto,
         } satisfies Trend,
         score,
+        weakSignal,
       };
     })
-    .sort((a, b) => b.score - a.score)
-    .map((entry) => entry.trend)
-    .filter((trend) => Boolean(trend.url || trend.titulo))
-    .slice(0, 8);
+    .filter((entry) => Boolean(entry.trend.url || entry.trend.titulo))
+    .sort((a, b) => b.score - a.score);
+
+  const strongFirst = ranked.filter((entry) => !entry.weakSignal);
+  const baseList = strongFirst.length >= 6 ? strongFirst : ranked;
+
+  return baseList.map((entry) => entry.trend).slice(0, 10);
 }
 
 export async function POST(req: NextRequest) {

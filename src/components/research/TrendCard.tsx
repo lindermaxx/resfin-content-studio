@@ -42,7 +42,7 @@ export function TrendCard({ trend, selected, onSelect }: TrendCardProps) {
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-center gap-1.5">
                   <TrendingUp className="h-3 w-3 text-zinc-400" />
-                  <span className="text-xs font-medium text-zinc-500">Viralização</span>
+                  <span className="text-xs font-medium text-zinc-500">Tração observada</span>
                 </div>
                 <ul className="flex flex-col gap-1">
                   {metricas.map((m, i) => (
