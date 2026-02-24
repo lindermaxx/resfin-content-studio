@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {
+  CalendarDays,
   Search,
   FileText,
   CheckCircle,
@@ -12,12 +13,21 @@ import { Badge } from "@/components/ui/badge";
 
 const modules = [
   {
+    href: "/strategy",
+    label: "Estratégia Mensal",
+    icon: CalendarDays,
+    description:
+      "Converse com Gemini para definir diagnóstico, Big Ideas e calendário editorial do mês.",
+    badge: "Passo 1",
+    badgeVariant: "secondary" as const,
+  },
+  {
     href: "/research",
-    label: "Research",
+    label: "Banco de Conteúdo",
     icon: Search,
     description:
-      "Busque trending topics de finanças e medicina ou insira seu próprio tema para começar.",
-    badge: "Passo 1",
+      "Salve links de referência e extraia legenda/transcrição para alimentar o processo criativo.",
+    badge: "Passo 2",
     badgeVariant: "secondary" as const,
   },
   {
@@ -26,7 +36,7 @@ const modules = [
     icon: FileText,
     description:
       "Gere 3 ideias de copy com a persona Leandro Ladeira e o contexto completo do @residenciaemfinancas.",
-    badge: "Passo 2",
+    badge: "Passo 3",
     badgeVariant: "secondary" as const,
   },
   {
@@ -35,7 +45,7 @@ const modules = [
     icon: CheckCircle,
     description:
       "Veja o mockup visual do post no Instagram. Edite inline, aprove ou peça nova versão.",
-    badge: "Passo 3",
+    badge: "Passo 4",
     badgeVariant: "secondary" as const,
   },
   {
@@ -44,7 +54,7 @@ const modules = [
     icon: Image,
     description:
       "Gere imagens com Google Imagen a partir da copy aprovada. Selecione a melhor variação.",
-    badge: "Passo 4",
+    badge: "Passo 5",
     badgeVariant: "secondary" as const,
   },
   {
@@ -53,7 +63,7 @@ const modules = [
     icon: LayoutDashboard,
     description:
       "Kanban com todos os posts: Pending → Approved → Published. Histórico completo.",
-    badge: "Passo 5",
+    badge: "Passo 6",
     badgeVariant: "secondary" as const,
   },
 ];
@@ -67,7 +77,7 @@ export default function HomePage() {
           ResFin Content Studio
         </h1>
         <p className="text-sm text-zinc-500">
-          Crie conteúdo para o @residenciaemfinancas em 5 passos — sem terminal,
+          Crie conteúdo para o @residenciaemfinancas em 6 passos — sem terminal,
           sem colar prompts.
         </p>
       </div>
@@ -106,9 +116,10 @@ export default function HomePage() {
       <div className="rounded-xl border border-zinc-200 bg-white px-6 py-5">
         <p className="text-sm text-zinc-600">
           <span className="font-medium text-zinc-900">Como começar:</span>{" "}
-          Clique em <span className="font-medium">Research</span> para buscar
-          trending topics ou digitar seu próprio tema. O fluxo guia você do tema
-          ao post aprovado com imagem.
+          comece por <span className="font-medium">Estratégia Mensal</span> para
+          fechar Big Ideas e calendário, depois avance para{" "}
+          <span className="font-medium">Banco de Conteúdo</span> e leve as
+          referências para o Copy Studio.
         </p>
       </div>
     </div>

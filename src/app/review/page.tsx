@@ -524,7 +524,7 @@ export default function ReviewPage() {
           <Badge variant="secondary">{formatoLabel[formato]}</Badge>
           <Badge variant="secondary">{vozLabel[voz]}</Badge>
           <Badge variant="outline">
-            {source === "trend" ? "Origem: trend" : "Origem: manual"}
+            {source === "trend" ? "Origem: referência" : "Origem: manual"}
           </Badge>
           {post && <Badge variant="outline">Atualizado: {formatDateTime(post.updated_at)}</Badge>}
         </div>

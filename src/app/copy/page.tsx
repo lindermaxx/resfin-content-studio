@@ -175,7 +175,7 @@ export default function CopyPage() {
             onClick={() => router.push("/research")}
             className="text-xs text-zinc-400 hover:text-zinc-700 shrink-0"
           >
-            Trocar tema
+            Voltar ao Banco
           </Button>
         </div>
       ) : (
@@ -186,7 +186,7 @@ export default function CopyPage() {
               onClick={() => router.push("/research")}
               className="font-medium underline"
             >
-              Voltar ao Research
+              Voltar ao Banco de Conteúdo
             </button>
           </p>
         </div>

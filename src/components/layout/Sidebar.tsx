@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  CalendarDays,
   Search,
   FileText,
   CheckCircle,
@@ -14,10 +15,16 @@ import { Separator } from "@/components/ui/separator";
 
 const navItems = [
   {
+    href: "/strategy",
+    label: "Estratégia",
+    icon: CalendarDays,
+    description: "Big ideas do mês",
+  },
+  {
     href: "/research",
-    label: "Research",
+    label: "Banco de Conteúdo",
     icon: Search,
-    description: "Trending topics",
+    description: "Referências extraídas",
   },
   {
     href: "/copy",

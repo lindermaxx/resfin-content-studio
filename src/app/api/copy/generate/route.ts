@@ -1,4 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextRequest, NextResponse } from "next/server";
 import type { CopyIdea, GenerateCopyRequest } from "@/lib/copy-types";
 
@@ -213,6 +213,18 @@ Para cada ideia, retorne um objeto JSON com:
 Retorne apenas o array JSON com 3 objetos.`;
 }
 
+function extractJsonArray(raw: string): CopyIdea[] {
+  const clean = raw.replace(/^```json\n?/, "").replace(/\n?```$/, "").trim();
+  const firstBracket = clean.indexOf("[");
+  const lastBracket = clean.lastIndexOf("]");
+  const candidate =
+    firstBracket >= 0 && lastBracket > firstBracket
+      ? clean.slice(firstBracket, lastBracket + 1)
+      : clean;
+
+  return JSON.parse(candidate) as CopyIdea[];
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body: GenerateCopyRequest = await req.json();
@@ -224,31 +236,24 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const apiKey = process.env.ANTHROPIC_API_KEY;
+    const apiKey = process.env.GOOGLE_AI_API_KEY;
     if (!apiKey) {
       return NextResponse.json(
-        { error: "Chave da API Anthropic não configurada." },
+        { error: "GOOGLE_AI_API_KEY não configurada." },
         { status: 500 }
       );
     }
 
-    const client = new Anthropic({ apiKey });
-
-    const message = await client.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 2048,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: "user", content: buildUserPrompt(body) }],
-    });
-
-    const text =
-      message.content[0].type === "text" ? message.content[0].text.trim() : "";
-
-    const clean = text.replace(/^```json\n?/, "").replace(/\n?```$/, "").trim();
+    const modelName = process.env.GOOGLE_TEXT_MODEL || "gemini-3-pro-preview";
+    const client = new GoogleGenerativeAI(apiKey);
+    const model = client.getGenerativeModel({ model: modelName });
+    const prompt = `${SYSTEM_PROMPT}\n\n${buildUserPrompt(body)}`;
+    const result = await model.generateContent(prompt);
+    const text = result.response.text().trim();
 
     let ideas: CopyIdea[];
     try {
-      ideas = JSON.parse(clean);
+      ideas = extractJsonArray(text);
     } catch {
       return NextResponse.json(
         { error: "O modelo retornou um formato inesperado. Tente novamente." },
