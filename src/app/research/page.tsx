@@ -249,7 +249,7 @@ export default function ResearchPage() {
     setExtractError(null);
     setExtracted(null);
     try {
-      const res = await fetch("/api/research/extract-url", {
+      const res = await fetch("/api/content-bank/extract", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: target }),

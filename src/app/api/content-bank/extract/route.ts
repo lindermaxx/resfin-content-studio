@@ -352,7 +352,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(content);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error("[/api/research/extract-url]", message);
+    console.error("[/api/content-bank/extract]", message);
     return NextResponse.json(
       { error: `Erro ao extrair conteúdo: ${message}` },
       { status: 500 }

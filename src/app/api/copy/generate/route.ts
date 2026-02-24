@@ -158,7 +158,7 @@ function buildUserPrompt(req: GenerateCopyRequest): string {
 ${req.contextoViral}
 """
 ${req.metricas?.length ? `Métricas de viralização: ${req.metricas.join(" | ")}` : ""}
-ESTRATÉGIA DE TREND HIJACKING: Entre na trend com adaptação cirúrgica. Mantenha o hook original quase intacto — troque apenas o protagonista e o contexto para o universo do médico. Quanto mais próximo do original, mais carona na trend. Exemplo: "5 coisas que pessoas ricas fazem" → "5 coisas que médicos ricos fazem e que você não faz". Mesmo ritmo, mesma estrutura, mesmo mecanismo de viralização — só o espelho muda para o médico se reconhecer.
+ESTRATÉGIA DE ADAPTAÇÃO DE REFERÊNCIA: Adapte o mecanismo da referência de forma cirúrgica. Mantenha a estrutura que performou e troque protagonista/contexto para o universo do médico. Exemplo: "5 coisas que pessoas ricas fazem" → "5 coisas que médicos ricos fazem e que você não faz". Mesmo ritmo e lógica, com espelho para o médico se reconhecer.
 `
     : "";
 
@@ -196,7 +196,7 @@ Tema: ${req.tema}
 Formato: ${formatoMap[req.formato]}
 Voz: ${vozMap[req.voz]}
 ${req.pilar ? `Pilar de conteúdo: ${req.pilar}` : ""}
-${req.hook ? `Hook de referência (do trending topic): "${req.hook}"` : ""}
+${req.hook ? `Hook de referência: "${req.hook}"` : ""}
 ${blocoViral}
 Gere 3 ideias com ângulos completamente diferentes:
 1. "educativo" — foco em ensinar com premissas lógicas e dados
