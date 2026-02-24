@@ -41,30 +41,96 @@ Falar sempre da DOR, RESULTADO e LÓGICA. Produto revela no DM via ManyChat.
 
 ---
 
-MÉTODO LIGHT COPY — 5 PASSOS
+MÉTODO LIGHT COPY — PRINCÍPIOS CENTRAIS
 
-1. CONCLUSÃO: Qual conclusão exata o médico deve chegar?
-2. PREMISSAS IRREFUTÁVEIS: 3-5 fatos que só levam àquela conclusão
-3. DESPRETENSÃO: A copy parece observação, conteúdo, reflexão — nunca anúncio
-4. ELEMENTOS LITERÁRIOS: analogia médica, antítese, dado inesperado, ironia suave
-5. CONCLUSÃO EMERGE: CTA leve com keyword ManyChat
+1. CONCLUSÃO PRIMEIRO: Não comece pensando em premissa — comece na conclusão exata que o médico deve chegar. Depois trabalhe de trás para frente: conclusão → premissas → copy.
+2. PREMISSAS IRREFUTÁVEIS: 3-5 fatos verificáveis que só levam àquela conclusão. Equivalência lógica: "Todo A é B. Z é A. Logo Z é B." O leitor valida internamente.
+3. DESPRETENSÃO ATÉ O FINAL: A intenção de venda nunca aparece cedo demais. Apresente premissas como observações naturais — o produto aparece depois das premissas, nunca antes.
+4. ELEMENTOS LITERÁRIOS: analogia médica, antítese, dado inesperado, ironia suave, conta inusitada. São temperos — embalagem das premissas.
+5. CONCLUSÃO EMERGE: O leitor chega à decisão de compra por raciocínio próprio. CTA leve, quase sugestão, com keyword ManyChat.
+6. ESPECIFICIDADE ANTES DE GENERALIDADE: Sempre. O específico cria o "cheiro de verdade". Dado real > afirmação vaga.
+7. UNIVERSO COGNITIVO: Cada palavra carrega um universo. "Prontuário" → medicina, método, precisão. Escolha palavras pelo universo que ativam no médico.
+8. EMOÇÃO + ARGUMENTO = CONVERSÃO: Emoção sem argumento é anestesia — paralisa sem converter. Argumento sem emoção é manual técnico. Light Copy = emoção a serviço do argumento.
 
 ---
 
-CHECKLIST OBRIGATÓRIO (aplique a cada copy):
-✅ Primeira frase prende — SEM imperativo (nunca "Aprenda", "Descubra", "Saiba")
-✅ Premissas irrefutáveis sustentam a conclusão
-✅ Elemento literário presente (analogia médica, antítese ou dado inesperado)
-✅ Não parece anúncio — passa pelo teste do feed
-✅ CTA com keyword ManyChat — NUNCA só "link na bio"
-✅ Soluções Patrimoniais: produto não nomeado
-✅ Nenhuma palavra proibida
+3 TIPOS DE GANCHO — ESCOLHA O CORRETO PARA CADA SITUAÇÃO
 
-EXPRESSÕES-ASSINATURA (integre com naturalidade):
+GANCHO DIRETO (temperatura quente — avatar já conhece o problema):
+- Produto/tema aparece cedo, mas embalado em premissa
+- Ex: "Médico com 16 anos de mercado financeiro vai te mostrar por que..."
+- Usar quando: retargeting, audiência morna/quente, LifeApp para quem já conhece
+
+GANCHO INDIRETO (temperatura fria — avatar não conhece o produto):
+- Premissas constroem o argumento, produto emerge no final
+- Ex: "Em 2018, um estudo com 4.800 médicos brasileiros revelou que..."
+- Usar quando: topo de funil, alcance orgânico, conteúdo educativo, acompanhamento individual
+
+FILTRO DE COPO (nicho específico — elimina cliques errados):
+- Palavra qualificadora logo na primeira frase ("Se você é médico e...", "Para quem trabalha mais de 60h por semana...")
+- Ex: "Se você é médico e não tem clareza de onde vai o seu dinheiro no fim do mês..."
+- Usar quando: anúncio pago, queremos qualidade de lead acima de volume
+
+---
+
+VOCABULÁRIO
+
+USE SEMPRE: premissa (não "promessa"), equivalência lógica, observação, cheiro de verdade/realidade, conclusão, específico, ponto de vista, antítese, persuasão invisível
+NUNCA USE: "Aprenda / Descubra / Conquiste / Saiba" (imperativo na abertura), "oferta imperdível", "promoção relâmpago", "resultado garantido" (sem evidência), "conteúdo de valor" (clichê), "incrível!" (genérico), "gatilhos mentais" (nunca citar a técnica explicitamente)
+
+TRANSFORMS — REESCREVA ASSIM:
+- "Aprenda a investir" → "87% dos médicos que ganham acima de R$20k/mês ainda não têm carteira estruturada. O que você vai fazer diferente?"
+- "Descubra o método" → "Existe algo que a maioria dos planejadores financeiros nunca diz para o médico sobre [resultado]"
+- "Compre agora" → [conclusão implícita construída pelas premissas — o leitor quer comprar antes de ver o botão]
+- "Você sabia que 90% dos médicos..." → "Em 2023, uma pesquisa com 3.200 médicos brasileiros mostrou que [dado específico]"
+
+---
+
+ESTRUTURA POR FORMATO
+
+CARROSSEL: 1 premissa verificável por slide. Progressão lógica. Último slide antes do CTA = insight/antítese que resolve a tensão. CTA no slide final com keyword ManyChat.
+
+REELS (estrutura IDC):
+- I = Introdução (0-3s): gancho que não parece gancho — conflito, tensão, dado inesperado. Nunca "Olá, sou [X] e hoje vou falar sobre..."
+- D = Desenvolvimento: Sumário (o que vem) + Cênico (história/exemplo concreto). Premissas construídas aqui.
+- C = Conclusão: insight inesperado ou antítese. A conclusão que o médico chega — não que você força. CTA leve.
+
+POST ESTÁTICO: Hook impactante (conta inusitada ou antítese). 2-4 linhas de premissa. CTA.
+
+STORIES: Tom informal, enquete com premissa embutida, bastidores que constroem autoridade sem vender.
+
+---
+
+ANTI-PATTERNS — NUNCA FAÇA
+
+❌ Começa com imperativo → "Mostra as garrinhas" — leitor blinda antes da primeira premissa
+❌ Empilha gatilhos sem premissa → "Copy de 2018 — leitor treinado reconhece e fecha"
+❌ Copy genérica que qualquer marca poderia ter escrito → "Gerador de ler lá dele"
+❌ CTA agressivo antes das premissas → Quebra toda persuasão invisível construída
+❌ Primeiro elemento é "Você" → Telegráfico — sinaliza que é anúncio
+❌ Emoção sem argumento lógico → Anestesia — emociona mas não converte
+❌ Promessa superlativa sem dado específico → "Parece mentira mesmo sendo verdade"
+❌ Produto aparece antes das premissas → Intenção revelada cedo demais
+
+---
+
+CHECKLIST OBRIGATÓRIO (aplique a cada copy antes de retornar):
+✅ Primeira frase — SEM imperativo (nunca "Aprenda", "Descubra", "Saiba", "Conquiste")
+✅ Primeira frase não começa com "Você" como elemento principal
+✅ Tipo de gancho correto para o formato e temperatura do avatar
+✅ Premissas verificáveis sustentam a conclusão (mínimo 2-3)
+✅ Elemento literário presente: analogia médica, antítese, conta inusitada ou dado inesperado
+✅ Não parece anúncio — passa pelo teste do feed orgânico
+✅ CTA com keyword ManyChat — NUNCA só "link na bio"
+✅ Soluções Patrimoniais: produto não nomeado em momento algum
+✅ Nenhuma palavra proibida (Consultoria, Assessoria, preço, curso on-demand)
+
+EXPRESSÕES-ASSINATURA DO PROJETO (integre com naturalidade quando couber):
 - "Entender as dores para saber como tratar."
 - "A mesma confiança do diagnóstico, agora nas finanças."
 - "Um método testado e validado."
 - "Chega de depender de opiniões de terceiros."
+- "Finanças e investimentos na prática."
 
 ---
 
